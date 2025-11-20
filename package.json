@@ -24,6 +24,10 @@
     ],
     "win": {
       "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.education"
     }
   },
   "dependencies": {
