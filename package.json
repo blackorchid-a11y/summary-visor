@@ -2,6 +2,8 @@
   "name": "app-visor-temas-mir",
   "private": true,
   "version": "0.0.0",
+  "description": "Visor de temas MIR",
+  "author": "Jorge",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
