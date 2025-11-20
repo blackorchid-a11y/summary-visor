@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@layer components {
+    .topic-content ol {
+        list-style-type: decimal;
+        padding-left: 1.5em;
+    }
+
+    .topic-content ul {
+        list-style-type: disc;
+        padding-left: 1.5em;
+    }
+
+    /* Remove any bullets/dots from list items in numbered lists */
+    .topic-content ol li::marker {
+        content: counter(list-item) ". ";
+    }
+
+    .topic-content span[style*="font-size"] {
+        line-height: 1.2;
+    }
+
+    /* Styles for draggable/resizable images */
+    .draggable-image {
+        position: absolute;
+        cursor: move;
+        border: 2px solid transparent;
+        transition: border-color 0.2s;
+        z-index: 10;
+    }
+
+    .draggable-image:hover,
+    .draggable-image.active {
+        border-color: #3b82f6;
+    }
+
+    .draggable-image .resize-handle {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        background: #3b82f6;
+        border: 2px solid white;
+        border-radius: 50%;
+        bottom: -6px;
+        right: -6px;
+        cursor: nwse-resize;
+    }
+
+    .draggable-image .delete-button {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 24px;
+        height: 24px;
+        background: #ef4444;
+        color: white;
+        border: 2px solid white;
+        border-radius: 50%;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: bold;
+    }
+
+    .draggable-image:hover .delete-button,
+    .draggable-image.active .delete-button {
+        display: flex;
+    }
+}
