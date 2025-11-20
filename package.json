@@ -25,11 +25,31 @@
       "electron/**/*"
     ],
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "public/logo.png"
     },
     "mac": {
-      "target": "dmg",
-      "category": "public.app-category.education"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "public.app-category.education",
+      "icon": "public/logo.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Education",
+      "icon": "public/logo.png"
     }
   },
   "dependencies": {
