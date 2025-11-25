@@ -1,7 +1,7 @@
 import React from 'react';
 import { FileText, Plus, Trash2 } from 'lucide-react';
 
-export function TopicList({ subject, topics, onSelectTopic, onAddTopic, onDeleteTopic }) {
+export function TopicList({ subject, topics, onSelectTopic, onAddTopic, onDeleteTopic, onAddDemoTopic }) {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -49,12 +49,34 @@ export function TopicList({ subject, topics, onSelectTopic, onAddTopic, onDelete
             {topics.length === 0 && (
                 <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
                     <p className="text-gray-500">No hay temas todavía.</p>
-                    <button
-                        onClick={onAddTopic}
-                        className="mt-2 text-blue-600 font-medium hover:underline"
-                    >
-                        Añadir el primero
-                    </button>
+                    <div className="flex flex-col items-center gap-3 mt-4">
+                        <button
+                            onClick={onAddTopic}
+                            className="text-blue-600 font-medium hover:underline"
+                        >
+                            Añadir el primero
+                        </button>
+                        <span className="text-gray-400 text-sm">o</span>
+                        <button
+                            onClick={() => {
+                                const demoTopic = {
+                                    id: crypto.randomUUID(),
+                                    subjectId: subject.id,
+                                    title: 'Tema de Ejemplo: Anatomía Cardíaca',
+                                    content: '<h1>Anatomía Cardíaca</h1><p>El corazón es un órgano muscular hueco...</p><h2>Cavidades</h2><ul><li>Aurícula Derecha</li><li>Ventrículo Derecho</li></ul>',
+                                    lastModified: Date.now(),
+                                };
+                                if (window.confirm('¿Cargar un tema de ejemplo?')) {
+                                    if (onAddDemoTopic) {
+                                        onAddDemoTopic(demoTopic);
+                                    }
+                                }
+                            }}
+                            className="text-sm text-gray-500 hover:text-gray-700 bg-gray-50 px-3 py-1 rounded-full border border-gray-200"
+                        >
+                            Cargar tema de ejemplo
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

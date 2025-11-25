@@ -20,6 +20,9 @@ export function TopicViewer({ topic, onBack }) {
 
     useEffect(() => {
         window.scrollTo(0, 0);
+        if (contentRef.current) {
+            contentRef.current.innerHTML = topic.content;
+        }
     }, [topic.id]);
 
     // ESC key listener for exiting reading mode
@@ -211,7 +214,7 @@ export function TopicViewer({ topic, onBack }) {
             // Make it draggable
             let isDragging = false;
             let isResizing = false;
-            let startX, startY, startLeft, startTop, startWidth;
+            let startX, startY, startWidth;
 
             wrapper.addEventListener('mousedown', (e) => {
                 if (e.target === resizeHandle) {
@@ -285,7 +288,7 @@ export function TopicViewer({ topic, onBack }) {
 
     return (
         <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
-            <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
+            <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-200 px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
                     {!isReadingMode && (
                         <button
@@ -360,7 +363,6 @@ export function TopicViewer({ topic, onBack }) {
                     contentEditable={!isReadingMode}
                     spellCheck={false}
                     onInput={handleInput}
-                    dangerouslySetInnerHTML={{ __html: topic.content }}
                     className="prose prose-blue max-w-none topic-content outline-none min-h-[50vh] leading-normal prose-p:my-1 prose-headings:my-2"
                 />
             </div>

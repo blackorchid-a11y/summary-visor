@@ -4,7 +4,7 @@ import { SubjectCard } from './components/SubjectCard';
 import { TopicList } from './components/TopicList';
 import { TopicViewer } from './components/TopicViewer';
 import { CreateSubjectModal } from './components/CreateSubjectModal';
-import { getSubjects, getTopicsBySubject, saveTopic, deleteTopic, initDB, saveSubject } from './lib/db';
+import { getSubjects, getTopicsBySubject, saveTopic, deleteTopic, initDB, saveSubject, getTopic } from './lib/db';
 import { initialSubjects } from './lib/initialData';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Plus } from 'lucide-react';
@@ -31,10 +31,55 @@ function App() {
         loadedSubjects = initialSubjects;
       }
       setSubjects(loadedSubjects);
+
+      // Restore state from localStorage
+      try {
+        const savedView = localStorage.getItem('app_view');
+        const savedSubjectId = localStorage.getItem('app_activeSubjectId');
+        const savedTopicId = localStorage.getItem('app_activeTopicId');
+
+        if (savedSubjectId) {
+          const subject = loadedSubjects.find(s => s.id === savedSubjectId);
+          if (subject) {
+            setActiveSubject(subject);
+            const subjectTopics = await getTopicsBySubject(subject.id);
+            setTopics(subjectTopics);
+
+            if (savedTopicId) {
+              const topic = await getTopic(savedTopicId);
+              if (topic) {
+                setActiveTopic(topic);
+              }
+            }
+
+            if (savedView) {
+              setView(savedView);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error restoring state:', error);
+      }
+
       setLoading(false);
     };
     loadData();
   }, []);
+
+  // Save state to localStorage
+  useEffect(() => {
+    localStorage.setItem('app_view', view);
+    if (view === 'home') {
+      localStorage.removeItem('app_activeSubjectId');
+      localStorage.removeItem('app_activeTopicId');
+    } else if (view === 'subject') {
+      if (activeSubject) localStorage.setItem('app_activeSubjectId', activeSubject.id);
+      localStorage.removeItem('app_activeTopicId');
+    } else if (view === 'topic') {
+      if (activeSubject) localStorage.setItem('app_activeSubjectId', activeSubject.id);
+      if (activeTopic) localStorage.setItem('app_activeTopicId', activeTopic.id);
+    }
+  }, [view, activeSubject, activeTopic]);
 
   const handleSubjectClick = async (subject) => {
     setActiveSubject(subject);
@@ -107,7 +152,7 @@ function App() {
   }
 
   return (
-    <Layout>
+    <Layout className="pt-[env(safe-area-inset-top)]">
       <AnimatePresence mode="wait">
         {view === 'home' && (
           <motion.div
@@ -169,6 +214,11 @@ function App() {
               onSelectTopic={handleTopicClick}
               onAddTopic={handleAddTopic}
               onDeleteTopic={handleDeleteTopic}
+              onAddDemoTopic={async (demoTopic) => {
+                await saveTopic(demoTopic);
+                const updatedTopics = await getTopicsBySubject(activeSubject.id);
+                setTopics(updatedTopics);
+              }}
             />
           </motion.div>
         )}

@@ -1,7 +1,7 @@
 {
   "name": "app-visor-temas-mir",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Visor de temas MIR",
   "author": "Jorge",
   "type": "module",
@@ -12,7 +12,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "electron": "electron .",
-    "electron:build": "vite build && electron-builder"
+    "electron:build": "vite build && electron-builder",
+    "ios:init": "npm run build && npx cap add ios",
+    "ios:sync": "npm run build && npx cap sync ios",
+    "ios:open": "npx cap open ios"
   },
   "build": {
     "appId": "com.mirsummaries.app",
@@ -58,6 +61,9 @@
     }
   },
   "dependencies": {
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/ios": "^7.4.4",
     "@tailwindcss/postcss": "^4.1.17",
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.24",
