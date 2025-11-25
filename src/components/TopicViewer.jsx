@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, BookOpen, X } from 'lucide-react';
 import { HighlightToolbar } from './HighlightToolbar';
 import { saveTopic } from '../lib/db';
 import mermaid from 'mermaid';
@@ -16,10 +16,23 @@ export function TopicViewer({ topic, onBack }) {
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);
     const [mermaidTheme, setMermaidTheme] = useState('default');
+    const [isReadingMode, setIsReadingMode] = useState(false);
 
     useEffect(() => {
         window.scrollTo(0, 0);
     }, [topic.id]);
+
+    // ESC key listener for exiting reading mode
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && isReadingMode) {
+                setIsReadingMode(false);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isReadingMode]);
 
     useEffect(() => {
         // Initialize mermaid diagrams
@@ -274,52 +287,77 @@ export function TopicViewer({ topic, onBack }) {
         <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
             <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-200 px-4 py-3 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <button
-                        onClick={onBack}
-                        className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
-                        title="Volver"
-                    >
-                        <ArrowLeft size={24} />
-                    </button>
+                    {!isReadingMode && (
+                        <button
+                            onClick={onBack}
+                            className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
+                            title="Volver"
+                        >
+                            <ArrowLeft size={24} />
+                        </button>
+                    )}
                     <h1 className="text-xl font-bold text-gray-900 truncate">
                         {topic.title}
                     </h1>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    {lastSaved && (
-                        <span className="text-xs text-gray-500 hidden sm:inline">
-                            Guardado: {lastSaved.toLocaleTimeString()}
-                        </span>
-                    )}
-                    <button
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className={`
-                            flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all
-                            ${isSaving
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow'
-                            }
-                        `}
-                    >
-                        <Save size={18} />
-                        {isSaving ? 'Guardado!' : 'Guardar'}
-                    </button>
-                </div>
+                {!isReadingMode && (
+                    <div className="flex items-center gap-3">
+                        {lastSaved && (
+                            <span className="text-xs text-gray-500 hidden sm:inline">
+                                Guardado: {lastSaved.toLocaleTimeString()}
+                            </span>
+                        )}
+                        <button
+                            onClick={() => setIsReadingMode(true)}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow"
+                            title="Modo lectura"
+                        >
+                            <BookOpen size={18} />
+                            <span className="hidden sm:inline">Lectura</span>
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            disabled={isSaving}
+                            className={`
+                                flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all
+                                ${isSaving
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow'
+                                }
+                            `}
+                        >
+                            <Save size={18} />
+                            {isSaving ? 'Guardado!' : 'Guardar'}
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="max-w-4xl mx-auto p-8 sm:p-12 relative">
+                {/* Exit reading mode button */}
+                {isReadingMode && (
+                    <button
+                        onClick={() => setIsReadingMode(false)}
+                        className="fixed top-4 right-4 z-20 p-2 bg-gray-800/80 hover:bg-gray-900 text-white rounded-full shadow-lg transition-all hover:scale-110"
+                        title="Salir del modo lectura (ESC)"
+                    >
+                        <X size={20} />
+                    </button>
+                )}
+
                 {/* Static Toolbar only */}
-                <HighlightToolbar
-                    onHighlight={handleHighlight}
-                    onFormat={handleFormat}
-                    onInsertImage={handleImageInsert}
-                />
+                {!isReadingMode && (
+                    <HighlightToolbar
+                        onHighlight={handleHighlight}
+                        onFormat={handleFormat}
+                        onInsertImage={handleImageInsert}
+                    />
+                )}
 
                 <div
                     ref={contentRef}
-                    contentEditable={true}
+                    contentEditable={!isReadingMode}
                     spellCheck={false}
                     onInput={handleInput}
                     dangerouslySetInnerHTML={{ __html: topic.content }}

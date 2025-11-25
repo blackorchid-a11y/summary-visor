@@ -25,8 +25,6 @@ jobs:
             platform: win
           - os: macos-latest
             platform: mac
-          - os: ubuntu-latest
-            platform: linux
 
     steps:
       - name: Check out repository
@@ -88,14 +86,7 @@ jobs:
             dist-electron/*.dmg
             dist-electron/*.dmg.blockmap
 
-      - name: Upload artifacts (Linux)
-        if: matrix.platform == 'linux' && !startsWith(github.ref, 'refs/tags/')
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-installer
-          path: |
-            dist-electron/*.AppImage
-            dist-electron/*.deb
+
 
   release:
     needs: build
@@ -114,7 +105,6 @@ jobs:
           files: |
             artifacts/windows-installer/*
             artifacts/macos-installer/*
-            artifacts/linux-installer/*
           draft: false
           prerelease: false
           generate_release_notes: true
