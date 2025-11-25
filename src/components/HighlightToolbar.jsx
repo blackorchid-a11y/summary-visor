@@ -12,6 +12,10 @@ const HIGHLIGHT_COLORS = [
     { id: 'blue', value: '#bfdbfe', label: 'Azul' },
     { id: 'pink', value: '#fbcfe8', label: 'Rosa' },
     { id: 'orange', value: '#fed7aa', label: 'Naranja' },
+    { id: 'purple', value: '#e9d5ff', label: 'Lila' },
+    { id: 'cyan', value: '#a5f3fc', label: 'Cian' },
+    { id: 'red', value: '#fecaca', label: 'Rojo claro' },
+    { id: 'gray', value: '#e5e7eb', label: 'Gris' },
 ];
 
 const TEXT_COLORS = [
@@ -20,6 +24,10 @@ const TEXT_COLORS = [
     { id: 'blue', value: '#3b82f6', label: 'Azul' },
     { id: 'green', value: '#22c55e', label: 'Verde' },
     { id: 'purple', value: '#a855f7', label: 'Morado' },
+    { id: 'orange', value: '#f97316', label: 'Naranja' },
+    { id: 'pink', value: '#ec4899', label: 'Rosa' },
+    { id: 'gray', value: '#4b5563', label: 'Gris' },
+    { id: 'teal', value: '#0d9488', label: 'Verde azulado' },
 ];
 
 const FONT_SIZES = [
@@ -134,7 +142,7 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
                     <Palette size={18} />
                 </button>
                 {showTextColors && (
-                    <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-50 flex gap-1">
+                    <div className="absolute top-full mt-1 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-50 flex flex-wrap gap-1 max-w-[160px]">
                         {TEXT_COLORS.map((color) => (
                             <button
                                 key={color.id}
@@ -247,7 +255,7 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
             <Divider />
 
             {/* Highlight Colors */}
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1">
                 {HIGHLIGHT_COLORS.map((color) => (
                     <button
                         key={color.id}
