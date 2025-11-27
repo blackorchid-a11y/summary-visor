@@ -32,8 +32,71 @@ function createWindow() {
     win.setMenuBarVisibility(false); // Hide default menu bar for cleaner look
 }
 
+// Auto-updater logic
+const log = require('electron-log');
+const { autoUpdater } = require('electron-updater');
+const { dialog, shell } = require('electron');
+
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = 'info';
+
+// Disable auto-download for macOS to handle it manually (notification only)
+// For Windows, we keep it true (default)
+if (process.platform === 'darwin') {
+    autoUpdater.autoDownload = false;
+}
+
+function checkForUpdates() {
+    if (!app.isPackaged) return;
+
+    log.info('Checking for updates...');
+    autoUpdater.checkForUpdatesAndNotify();
+}
+
+autoUpdater.on('update-available', (info) => {
+    log.info('Update available:', info);
+
+    if (process.platform === 'darwin') {
+        dialog.showMessageBox({
+            type: 'info',
+            title: 'Actualización disponible',
+            message: `Una nueva versión (${info.version}) está disponible.`,
+            detail: '¿Quieres descargarla ahora desde GitHub?',
+            buttons: ['Sí, descargar', 'Más tarde'],
+            defaultId: 0
+        }).then(({ response }) => {
+            if (response === 0) {
+                shell.openExternal('https://github.com/blackorchid-a11y/summary-visor/releases/latest');
+            }
+        });
+    }
+    // On Windows, it will auto-download by default
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+    log.info('Update downloaded:', info);
+
+    dialog.showMessageBox({
+        type: 'info',
+        title: 'Actualización lista',
+        message: 'La actualización se ha descargado. La aplicación se reiniciará para instalarla.',
+        buttons: ['Reiniciar ahora', 'Más tarde']
+    }).then(({ response }) => {
+        if (response === 0) {
+            autoUpdater.quitAndInstall();
+        }
+    });
+});
+
+autoUpdater.on('error', (err) => {
+    log.error('Error in auto-updater:', err);
+});
+
 app.whenReady().then(() => {
     createWindow();
+
+    // Check for updates after a short delay
+    setTimeout(checkForUpdates, 3000);
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

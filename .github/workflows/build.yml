@@ -55,7 +55,7 @@ jobs:
       - name: Build Electron app
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run electron:build
+        run: npm run electron:build -- --publish never
         continue-on-error: false
 
       # Retry build if it fails (for Windows specifically)
@@ -76,6 +76,7 @@ jobs:
           path: |
             dist-electron/*.exe
             dist-electron/*.exe.blockmap
+            dist-electron/*.yml
 
       - name: Upload artifacts (macOS)
         if: matrix.platform == 'mac' && !startsWith(github.ref, 'refs/tags/')
@@ -85,6 +86,7 @@ jobs:
           path: |
             dist-electron/*.dmg
             dist-electron/*.dmg.blockmap
+            dist-electron/*.yml
 
 
 
