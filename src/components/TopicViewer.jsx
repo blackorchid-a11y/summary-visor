@@ -288,9 +288,9 @@ export function TopicViewer({ topic, onBack }) {
 
     return (
         <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
-            <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-200 px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] flex items-center justify-between shadow-sm">
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                    {!isReadingMode && (
+            {!isReadingMode && (
+                <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-200 px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
                         <button
                             onClick={onBack}
                             className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
@@ -298,13 +298,11 @@ export function TopicViewer({ topic, onBack }) {
                         >
                             <ArrowLeft size={24} />
                         </button>
-                    )}
-                    <h1 className="text-xl font-bold text-gray-900 truncate">
-                        {topic.title}
-                    </h1>
-                </div>
+                        <h1 className="text-xl font-bold text-gray-900 truncate">
+                            {topic.title}
+                        </h1>
+                    </div>
 
-                {!isReadingMode && (
                     <div className="flex items-center gap-3">
                         {lastSaved && (
                             <span className="text-xs text-gray-500 hidden sm:inline">
@@ -334,8 +332,8 @@ export function TopicViewer({ topic, onBack }) {
                             {isSaving ? 'Guardado!' : 'Guardar'}
                         </button>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
 
             <div className="max-w-4xl mx-auto p-8 sm:p-12 relative">
                 {/* Exit reading mode button */}
