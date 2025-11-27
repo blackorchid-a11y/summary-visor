@@ -1,7 +1,7 @@
 {
   "name": "app-visor-temas-mir",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "Visor de temas MIR",
   "author": "Jorge",
   "type": "module",
@@ -58,7 +58,10 @@
       ],
       "category": "Education",
       "icon": "public/logo.png"
-    }
+    },
+    "publish": [
+      "github"
+    ]
   },
   "dependencies": {
     "@capacitor/cli": "^7.4.4",
@@ -66,6 +69,8 @@
     "@capacitor/ios": "^7.4.4",
     "@tailwindcss/postcss": "^4.1.17",
     "clsx": "^2.1.1",
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.6.2",
     "framer-motion": "^12.23.24",
     "idb": "^8.0.3",
     "lucide-react": "^0.554.0",
