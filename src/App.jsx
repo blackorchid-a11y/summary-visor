@@ -152,7 +152,10 @@ function App() {
   }
 
   return (
-    <Layout className="pt-[env(safe-area-inset-top)]">
+    <Layout
+      className={view === 'topic' ? "" : "pt-[env(safe-area-inset-top)]"}
+      fullScreen={view === 'topic'}
+    >
       <AnimatePresence mode="wait">
         {view === 'home' && (
           <motion.div
@@ -230,7 +233,7 @@ function App() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50"
+            className="min-h-screen bg-white"
           >
             <TopicViewer topic={activeTopic} onBack={handleBack} />
           </motion.div>

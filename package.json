@@ -9,13 +9,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:mac": "vite build && electron-builder --mac --arm64",
+    "build:mac-universal": "vite build && electron-builder --mac --universal",
+    "build:win": "vite build && electron-builder --win",
     "lint": "eslint .",
     "preview": "vite preview",
     "electron": "electron .",
     "electron:build": "vite build && electron-builder",
     "ios:init": "npm run build && npx cap add ios",
     "ios:sync": "npm run build && npx cap sync ios",
-    "ios:open": "npx cap open ios"
+    "ios:open": "npx cap open ios",
+    "resources": "capacitor-assets generate"
   },
   "build": {
     "appId": "com.mirsummaries.app",
@@ -80,6 +84,7 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@eslint/js": "^9.39.1",
     "@tailwindcss/vite": "^4.1.17",
     "@types/react": "^19.2.2",

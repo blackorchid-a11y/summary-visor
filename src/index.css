@@ -1,5 +1,32 @@
 @import "tailwindcss";
 
+/* Mobile zoom fixes */
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+body {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    overscroll-behavior-y: none;
+}
+
+input,
+textarea,
+select,
+button {
+    font-size: 16px;
+}
+
+@media screen and (max-width: 768px) {
+    input,
+    textarea,
+    select {
+        font-size: 16px;
+    }
+}
+
 @layer components {
     .topic-content ol {
         list-style-type: decimal;
@@ -11,7 +38,6 @@
         padding-left: 1.5em;
     }
 
-    /* Remove any bullets/dots from list items in numbered lists */
     .topic-content ol li::marker {
         content: counter(list-item) ". ";
     }
@@ -20,7 +46,212 @@
         line-height: 1.2;
     }
 
-    /* Styles for draggable/resizable images */
+    /* ========================================
+       Editor Image Wrapper - Base Styles
+       ======================================== */
+    
+    .editor-image-wrapper {
+        display: inline-block;
+        position: relative;
+        max-width: 100%;
+        margin: 8px;
+        border: 2px solid transparent;
+        border-radius: 6px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        vertical-align: top;
+        cursor: default;
+        background: white;
+    }
+
+    .editor-image-wrapper:hover {
+        border-color: #93c5fd;
+    }
+
+    .editor-image-wrapper.selected {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+
+    .editor-image-wrapper.dragging {
+        opacity: 0.8;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+        z-index: 100 !important;
+    }
+
+    .editor-image-wrapper img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 4px;
+        pointer-events: none;
+        user-select: none;
+    }
+
+    /* ========================================
+       Floating Image Styles
+       ======================================== */
+    
+    .editor-image-wrapper[data-floating="true"] {
+        cursor: default;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .editor-image-wrapper[data-floating="true"]:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    /* ========================================
+       Image Controls
+       ======================================== */
+
+    /* Resize handle */
+    .image-resize-handle {
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        background: #3b82f6;
+        border: 2px solid white;
+        border-radius: 50%;
+        bottom: -7px;
+        right: -7px;
+        cursor: nwse-resize;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        z-index: 10;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    .editor-image-wrapper:hover .image-resize-handle,
+    .editor-image-wrapper.selected .image-resize-handle {
+        opacity: 1;
+    }
+
+    /* Delete button */
+    .image-delete-btn {
+        position: absolute;
+        top: -10px;
+        right: -10px;
+        width: 24px;
+        height: 24px;
+        background: #ef4444;
+        color: white;
+        border: 2px solid white;
+        border-radius: 50%;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        font-weight: bold;
+        line-height: 1;
+        z-index: 10;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        user-select: none;
+    }
+
+    .image-delete-btn:hover {
+        background: #dc2626;
+        transform: scale(1.1);
+    }
+
+    .editor-image-wrapper:hover .image-delete-btn,
+    .editor-image-wrapper.selected .image-delete-btn {
+        display: flex;
+    }
+
+    /* Mode toggle button (inline/floating) */
+    .image-mode-btn {
+        position: absolute;
+        top: -10px;
+        left: -10px;
+        width: 24px;
+        height: 24px;
+        background: #8b5cf6;
+        color: white;
+        border: 2px solid white;
+        border-radius: 50%;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        line-height: 1;
+        z-index: 10;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        user-select: none;
+    }
+
+    .image-mode-btn:hover {
+        background: #7c3aed;
+        transform: scale(1.1);
+    }
+
+    .editor-image-wrapper:hover .image-mode-btn,
+    .editor-image-wrapper.selected .image-mode-btn {
+        display: flex;
+    }
+
+    /* Drag handle (only for floating images) */
+    .image-drag-handle {
+        position: absolute;
+        top: 50%;
+        left: -20px;
+        transform: translateY(-50%);
+        width: 16px;
+        height: 32px;
+        background: #6b7280;
+        color: white;
+        border-radius: 4px 0 0 4px;
+        cursor: move;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        letter-spacing: -2px;
+        opacity: 0;
+        transition: opacity 0.2s ease, background 0.2s ease;
+        z-index: 10;
+        user-select: none;
+    }
+
+    .image-drag-handle:hover {
+        background: #4b5563;
+    }
+
+    .editor-image-wrapper[data-floating="true"]:hover .image-drag-handle,
+    .editor-image-wrapper[data-floating="true"].selected .image-drag-handle {
+        opacity: 1;
+    }
+
+    /* ========================================
+       Reading Mode - Hide all controls
+       ======================================== */
+    
+    .topic-content:not([contenteditable="true"]) .image-resize-handle,
+    .topic-content:not([contenteditable="true"]) .image-delete-btn,
+    .topic-content:not([contenteditable="true"]) .image-mode-btn,
+    .topic-content:not([contenteditable="true"]) .image-drag-handle {
+        display: none !important;
+    }
+
+    .topic-content:not([contenteditable="true"]) .editor-image-wrapper {
+        border-color: transparent !important;
+        cursor: default;
+    }
+
+    .topic-content:not([contenteditable="true"]) .editor-image-wrapper:hover {
+        border-color: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .topic-content:not([contenteditable="true"]) .editor-image-wrapper[data-floating="true"] {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    /* ========================================
+       Legacy draggable image styles (deprecated)
+       ======================================== */
     .draggable-image {
         position: absolute;
         cursor: move;
