@@ -22,7 +22,6 @@ export function TopicViewer({ topic, onBack }) {
     const [selectedImage, setSelectedImage] = useState(null);
     const [currentTopic, setCurrentTopic] = useState(topic);
 
-    // Refs for drag state (avoid re-renders during drag)
     const dragStateRef = useRef({
         isDragging: false,
         startX: 0,
@@ -32,7 +31,6 @@ export function TopicViewer({ topic, onBack }) {
         element: null
     });
 
-    // Load topic from DB to ensure we have the latest content
     useEffect(() => {
         const loadTopicFromDB = async () => {
             try {
@@ -41,7 +39,6 @@ export function TopicViewer({ topic, onBack }) {
                     setCurrentTopic(freshTopic);
                     if (contentRef.current) {
                         contentRef.current.innerHTML = freshTopic.content;
-                        // Small delay to ensure DOM is ready
                         setTimeout(() => {
                             setupAllImageListeners();
                         }, 50);
@@ -59,7 +56,6 @@ export function TopicViewer({ topic, onBack }) {
         loadTopicFromDB();
     }, [topic.id]);
 
-    // ESC key listener for exiting reading mode and deselecting images
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (e.key === 'Escape') {
@@ -69,7 +65,6 @@ export function TopicViewer({ topic, onBack }) {
                     setIsReadingMode(false);
                 }
             }
-            // Delete selected image with Delete or Backspace key
             if ((e.key === 'Delete' || e.key === 'Backspace') && selectedImage) {
                 e.preventDefault();
                 selectedImage.remove();
@@ -81,7 +76,6 @@ export function TopicViewer({ topic, onBack }) {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isReadingMode, selectedImage]);
 
-    // Click outside to deselect image
     useEffect(() => {
         const handleClickOutside = (e) => {
             if (selectedImage && !e.target.closest('.editor-image-wrapper')) {
@@ -93,7 +87,6 @@ export function TopicViewer({ topic, onBack }) {
         return () => document.removeEventListener('click', handleClickOutside);
     }, [selectedImage]);
 
-    // Global mouse/touch move and up handlers for dragging
     useEffect(() => {
         const handleGlobalMouseMove = (e) => {
             const state = dragStateRef.current;
@@ -109,8 +102,7 @@ export function TopicViewer({ topic, onBack }) {
             const newLeft = state.startLeft + deltaX;
             const newTop = state.startTop + deltaY;
 
-            // Apply constraints
-            const container = editorContainerRef.current;
+            const container = contentRef.current;
             if (container) {
                 const maxLeft = container.offsetWidth - state.element.offsetWidth;
                 const constrainedLeft = Math.max(0, Math.min(newLeft, maxLeft));
@@ -180,78 +172,6 @@ export function TopicViewer({ topic, onBack }) {
         initMermaid();
     }, [currentTopic.content, mermaidTheme]);
 
-    // Toggle image between inline and floating mode
-    const toggleImageMode = useCallback((wrapper) => {
-        if (!wrapper || !isEditMode) return;
-
-        const isFloating = wrapper.getAttribute('data-floating') === 'true';
-
-        if (isFloating) {
-            // Convert to inline
-            wrapper.setAttribute('data-floating', 'false');
-            wrapper.style.position = 'relative';
-            wrapper.style.left = '';
-            wrapper.style.top = '';
-            wrapper.style.zIndex = '';
-            wrapper.style.cursor = '';
-
-            // Remove drag handle if exists
-            const dragHandle = wrapper.querySelector('.image-drag-handle');
-            if (dragHandle) {
-                dragHandle.remove();
-            }
-
-            // Remove mode toggle button text update
-            const modeBtn = wrapper.querySelector('.image-mode-btn');
-            if (modeBtn) {
-                modeBtn.innerHTML = '⇱';
-                modeBtn.title = 'Cambiar a modo libre (doble clic)';
-            }
-        } else {
-            // Convert to floating
-            const containerRect = editorContainerRef.current?.getBoundingClientRect();
-            const wrapperRect = wrapper.getBoundingClientRect();
-
-            // Calculate position relative to container
-            let newLeft = 50;
-            let newTop = 50;
-
-            if (containerRect) {
-                newLeft = wrapperRect.left - containerRect.left;
-                newTop = wrapperRect.top - containerRect.top + (editorContainerRef.current?.scrollTop || 0);
-            }
-
-            wrapper.setAttribute('data-floating', 'true');
-            wrapper.style.position = 'absolute';
-            wrapper.style.left = newLeft + 'px';
-            wrapper.style.top = newTop + 'px';
-            wrapper.style.zIndex = '5';
-            wrapper.style.cursor = 'move';
-
-            // Add drag handle if not exists
-            if (!wrapper.querySelector('.image-drag-handle')) {
-                const dragHandle = document.createElement('span');
-                dragHandle.className = 'image-drag-handle';
-                dragHandle.innerHTML = '⋮⋮';
-                dragHandle.contentEditable = 'false';
-                dragHandle.title = 'Arrastrar imagen';
-                wrapper.appendChild(dragHandle);
-
-                // Setup drag for handle
-                setupDragForElement(wrapper, dragHandle);
-            }
-
-            // Update mode toggle button
-            const modeBtn = wrapper.querySelector('.image-mode-btn');
-            if (modeBtn) {
-                modeBtn.innerHTML = '⇲';
-                modeBtn.title = 'Cambiar a modo en línea';
-            }
-        }
-
-        setSelectedImage(wrapper);
-    }, [isEditMode]);
-
     // Setup drag functionality for a floating image
     const setupDragForElement = useCallback((wrapper, dragHandle) => {
         const handleDragStart = (e) => {
@@ -281,18 +201,107 @@ export function TopicViewer({ topic, onBack }) {
         dragHandle.addEventListener('touchstart', handleDragStart, { passive: false });
     }, [isEditMode]);
 
+    // Toggle image between inline and floating mode
+    const toggleImageMode = useCallback((wrapper) => {
+        if (!wrapper || !isEditMode) return;
+
+        const contentContainer = contentRef.current;
+        if (!contentContainer) return;
+
+        const isFloating = wrapper.getAttribute('data-floating') === 'true';
+
+        if (isFloating) {
+            // Convert from floating to inline
+            wrapper.setAttribute('data-floating', 'false');
+            wrapper.style.position = 'relative';
+            wrapper.style.left = '';
+            wrapper.style.top = '';
+            wrapper.style.zIndex = '';
+            wrapper.style.cursor = '';
+
+            const dragHandle = wrapper.querySelector('.image-drag-handle');
+            if (dragHandle) {
+                dragHandle.remove();
+            }
+
+            const modeBtn = wrapper.querySelector('.image-mode-btn');
+            if (modeBtn) {
+                modeBtn.innerHTML = '⇱';
+                modeBtn.title = 'Cambiar a modo libre (doble clic)';
+            }
+
+            // Move back into text flow - create a new paragraph for it
+            const newParagraph = document.createElement('p');
+            newParagraph.appendChild(wrapper);
+            contentContainer.appendChild(newParagraph);
+
+        } else {
+            // Convert from inline to floating
+            
+            // First, get the current visual position BEFORE any DOM changes
+            const wrapperRect = wrapper.getBoundingClientRect();
+            const contentRect = contentContainer.getBoundingClientRect();
+            
+            // Calculate position relative to contentContainer
+            const newLeft = wrapperRect.left - contentRect.left;
+            const newTop = wrapperRect.top - contentRect.top;
+
+            // Ensure non-negative values
+            const finalLeft = Math.max(0, newLeft);
+            const finalTop = Math.max(0, newTop);
+
+            // Store reference to parent before moving
+            const oldParent = wrapper.parentNode;
+
+            // Move wrapper to be a direct child of contentContainer
+            // This is crucial - floating images must be direct children of the positioned container
+            contentContainer.appendChild(wrapper);
+
+            // Clean up old parent if it's now empty (was just containing the image)
+            if (oldParent && oldParent !== contentContainer && oldParent.childNodes.length === 0) {
+                oldParent.remove();
+            }
+
+            // Now apply floating styles
+            wrapper.setAttribute('data-floating', 'true');
+            wrapper.style.position = 'absolute';
+            wrapper.style.left = finalLeft + 'px';
+            wrapper.style.top = finalTop + 'px';
+            wrapper.style.zIndex = '5';
+            wrapper.style.cursor = 'move';
+            wrapper.style.margin = '0'; // Remove margin for absolute positioning
+
+            // Add drag handle if not exists
+            if (!wrapper.querySelector('.image-drag-handle')) {
+                const dragHandle = document.createElement('span');
+                dragHandle.className = 'image-drag-handle';
+                dragHandle.innerHTML = '⋮⋮';
+                dragHandle.contentEditable = 'false';
+                dragHandle.title = 'Arrastrar imagen';
+                wrapper.appendChild(dragHandle);
+
+                setupDragForElement(wrapper, dragHandle);
+            }
+
+            const modeBtn = wrapper.querySelector('.image-mode-btn');
+            if (modeBtn) {
+                modeBtn.innerHTML = '⇲';
+                modeBtn.title = 'Cambiar a modo en línea';
+            }
+        }
+
+        setSelectedImage(wrapper);
+    }, [isEditMode, setupDragForElement]);
+
     // Setup all event listeners for an image wrapper
     const setupImageWrapperListeners = useCallback((wrapper) => {
         if (!wrapper) return;
 
-        // Remove existing listeners by cloning (clean slate)
-        const img = wrapper.querySelector('img');
         const resizeHandle = wrapper.querySelector('.image-resize-handle');
         const deleteBtn = wrapper.querySelector('.image-delete-btn');
         const modeBtn = wrapper.querySelector('.image-mode-btn');
         const dragHandle = wrapper.querySelector('.image-drag-handle');
 
-        // Click to select
         wrapper.onclick = (e) => {
             if (!isEditMode) return;
             e.preventDefault();
@@ -300,7 +309,6 @@ export function TopicViewer({ topic, onBack }) {
             setSelectedImage(wrapper);
         };
 
-        // Double click to toggle mode
         wrapper.ondblclick = (e) => {
             if (!isEditMode) return;
             e.preventDefault();
@@ -308,7 +316,6 @@ export function TopicViewer({ topic, onBack }) {
             toggleImageMode(wrapper);
         };
 
-        // Delete button
         if (deleteBtn) {
             deleteBtn.onclick = (e) => {
                 e.preventDefault();
@@ -318,7 +325,6 @@ export function TopicViewer({ topic, onBack }) {
             };
         }
 
-        // Mode toggle button
         if (modeBtn) {
             modeBtn.onclick = (e) => {
                 e.preventDefault();
@@ -327,7 +333,6 @@ export function TopicViewer({ topic, onBack }) {
             };
         }
 
-        // Resize handle
         if (resizeHandle) {
             let isResizing = false;
             let startX = 0;
@@ -369,13 +374,11 @@ export function TopicViewer({ topic, onBack }) {
             resizeHandle.ontouchstart = handleResizeStart;
         }
 
-        // Drag handle (for floating images)
         if (dragHandle) {
             setupDragForElement(wrapper, dragHandle);
         }
     }, [isEditMode, toggleImageMode, setupDragForElement]);
 
-    // Setup listeners for all images in the content
     const setupAllImageListeners = useCallback(() => {
         if (!contentRef.current) return;
 
@@ -385,13 +388,12 @@ export function TopicViewer({ topic, onBack }) {
         });
     }, [setupImageWrapperListeners]);
 
-    // Re-setup listeners when edit mode changes
     useEffect(() => {
         setupAllImageListeners();
     }, [isEditMode, setupAllImageListeners]);
 
     const handleInput = async () => {
-        // Auto-save logic removed in favor of manual save
+        // Auto-save logic removed
     };
 
     const handleSave = async () => {
@@ -400,7 +402,6 @@ export function TopicViewer({ topic, onBack }) {
 
         setIsSaving(true);
         try {
-            // Clean up selection classes before saving
             const selectedWrappers = contentDiv.querySelectorAll('.editor-image-wrapper.selected');
             selectedWrappers.forEach(w => w.classList.remove('selected'));
 
@@ -479,7 +480,6 @@ export function TopicViewer({ topic, onBack }) {
         applyFormat(type, value);
     };
 
-    // Create image wrapper element with controls
     const createImageWrapper = useCallback((imgSrc, initialWidth = 300) => {
         const wrapper = document.createElement('span');
         wrapper.className = 'editor-image-wrapper';
@@ -492,19 +492,16 @@ export function TopicViewer({ topic, onBack }) {
         img.style.cssText = 'width: 100%; height: auto; display: block; border-radius: 4px;';
         img.draggable = false;
 
-        // Resize handle
         const resizeHandle = document.createElement('span');
         resizeHandle.className = 'image-resize-handle';
         resizeHandle.contentEditable = 'false';
 
-        // Delete button
         const deleteBtn = document.createElement('span');
         deleteBtn.className = 'image-delete-btn';
         deleteBtn.innerHTML = '×';
         deleteBtn.contentEditable = 'false';
         deleteBtn.title = 'Eliminar imagen';
 
-        // Mode toggle button
         const modeBtn = document.createElement('span');
         modeBtn.className = 'image-mode-btn';
         modeBtn.innerHTML = '⇱';
@@ -516,13 +513,11 @@ export function TopicViewer({ topic, onBack }) {
         wrapper.appendChild(deleteBtn);
         wrapper.appendChild(modeBtn);
 
-        // Setup listeners
         setupImageWrapperListeners(wrapper);
 
         return wrapper;
     }, [setupImageWrapperListeners]);
 
-    // Insert image at cursor position or at end
     const insertImageAtCursor = useCallback((imgSrc) => {
         const contentDiv = contentRef.current;
         if (!contentDiv) return;
@@ -553,13 +548,11 @@ export function TopicViewer({ topic, onBack }) {
             }
         }
 
-        // Fallback: append to end
         const p = document.createElement('p');
         p.appendChild(wrapper);
         contentDiv.appendChild(p);
     }, [createImageWrapper]);
 
-    // Image handling - file picker
     const handleImageInsert = useCallback(() => {
         const input = document.createElement('input');
         input.type = 'file';
@@ -573,7 +566,6 @@ export function TopicViewer({ topic, onBack }) {
         input.click();
     }, []);
 
-    // Process image file and convert to base64
     const processImageFile = useCallback(async (file) => {
         const maxSize = 5 * 1024 * 1024;
         if (file.size > maxSize) {
@@ -595,7 +587,6 @@ export function TopicViewer({ topic, onBack }) {
         });
     }, [insertImageAtCursor]);
 
-    // Handle paste event for images from clipboard
     useEffect(() => {
         const handlePaste = async (e) => {
             if (!isEditMode) return;
@@ -622,7 +613,6 @@ export function TopicViewer({ topic, onBack }) {
         }
     }, [isEditMode, processImageFile]);
 
-    // Update selected state visually
     useEffect(() => {
         if (!contentRef.current) return;
 
@@ -699,7 +689,6 @@ export function TopicViewer({ topic, onBack }) {
                 className="max-w-4xl mx-auto p-8 sm:p-12 relative"
                 style={{ position: 'relative', minHeight: '80vh' }}
             >
-                {/* Exit reading mode button */}
                 {isReadingMode && (
                     <button
                         onClick={() => setIsReadingMode(false)}
@@ -710,7 +699,6 @@ export function TopicViewer({ topic, onBack }) {
                     </button>
                 )}
 
-                {/* Static Toolbar only in edit mode */}
                 {!isReadingMode && isEditMode && (
                     <HighlightToolbar
                         onHighlight={handleHighlight}
