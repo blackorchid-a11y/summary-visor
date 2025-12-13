@@ -58,13 +58,14 @@ const FONT_SIZES = [
     { id: 'xlarge', value: '7', label: 'Extra Grande' },
 ];
 
-// Storage key for custom colors
-const CUSTOM_COLORS_KEY = 'highlight-toolbar-custom-colors';
+// Storage keys for custom colors
+const CUSTOM_TEXT_COLORS_KEY = 'highlight-toolbar-custom-text-colors';
+const CUSTOM_HIGHLIGHT_COLORS_KEY = 'highlight-toolbar-custom-highlight-colors';
 
 // Load custom colors from localStorage
-const loadCustomColors = () => {
+const loadCustomColors = (key) => {
     try {
-        const stored = localStorage.getItem(CUSTOM_COLORS_KEY);
+        const stored = localStorage.getItem(key);
         return stored ? JSON.parse(stored) : [];
     } catch {
         return [];
@@ -72,13 +73,29 @@ const loadCustomColors = () => {
 };
 
 // Save custom colors to localStorage
-const saveCustomColors = (colors) => {
+const saveCustomColors = (key, colors) => {
     try {
-        localStorage.setItem(CUSTOM_COLORS_KEY, JSON.stringify(colors));
+        localStorage.setItem(key, JSON.stringify(colors));
     } catch {
         // Ignore storage errors
     }
 };
+
+// Highlight-specific color palette (lighter/pastel colors suitable for highlighting)
+const HIGHLIGHT_PALETTE = [
+    // Row 1: Very light pastels
+    ['#fff9c4', '#ffe0b2', '#ffccbc', '#f8bbd9', '#e1bee7', '#d1c4e9', '#c5cae9', '#bbdefb', '#b2ebf2', '#b2dfdb'],
+    // Row 2: Light pastels
+    ['#fff59d', '#ffcc80', '#ffab91', '#f48fb1', '#ce93d8', '#b39ddb', '#9fa8da', '#90caf9', '#80deea', '#80cbc4'],
+    // Row 3: Medium pastels
+    ['#fef08a', '#fed7aa', '#fecaca', '#fbcfe8', '#e9d5ff', '#c4b5fd', '#a5b4fc', '#bfdbfe', '#a5f3fc', '#99f6e4'],
+    // Row 4: Soft colors
+    ['#fde047', '#fdba74', '#fca5a5', '#f9a8d4', '#d8b4fe', '#a78bfa', '#818cf8', '#93c5fd', '#67e8f9', '#5eead4'],
+    // Row 5: Standard highlights
+    ['#facc15', '#fb923c', '#f87171', '#ec4899', '#c084fc', '#8b5cf6', '#6366f1', '#60a5fa', '#22d3ee', '#2dd4bf'],
+    // Row 6: Greens and naturals
+    ['#d9ead3', '#b6d7a8', '#93c47d', '#a3e635', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9'],
+];
 
 export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImage, className }) {
     const [showTextColors, setShowTextColors] = useState(false);
@@ -86,9 +103,11 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
     const [showLineHeight, setShowLineHeight] = useState(false);
     const [showParagraphSpacing, setShowParagraphSpacing] = useState(false);
     const [showMermaidTheme, setShowMermaidTheme] = useState(false);
-    const [customColors, setCustomColors] = useState(loadCustomColors);
+    const [customTextColors, setCustomTextColors] = useState(() => loadCustomColors(CUSTOM_TEXT_COLORS_KEY));
+    const [customHighlightColors, setCustomHighlightColors] = useState(() => loadCustomColors(CUSTOM_HIGHLIGHT_COLORS_KEY));
     const [showTablePicker, setShowTablePicker] = useState(false);
     const [tableHover, setTableHover] = useState({ rows: 0, cols: 0 });
+    const [showHighlightPicker, setShowHighlightPicker] = useState(false);
 
     const style = position ? {
         position: 'fixed',
@@ -102,19 +121,36 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
         e.preventDefault(); // Prevent focus loss from content
     };
 
-    const handleAddCustomColor = () => {
+    const handleAddCustomTextColor = () => {
         const input = document.createElement('input');
         input.type = 'color';
         input.value = '#000000';
         input.addEventListener('change', (e) => {
             const newColor = e.target.value;
-            if (!customColors.includes(newColor)) {
-                const updatedColors = [...customColors, newColor].slice(-10); // Keep last 10
-                setCustomColors(updatedColors);
-                saveCustomColors(updatedColors);
+            if (!customTextColors.includes(newColor)) {
+                const updatedColors = [...customTextColors, newColor].slice(-10); // Keep last 10
+                setCustomTextColors(updatedColors);
+                saveCustomColors(CUSTOM_TEXT_COLORS_KEY, updatedColors);
             }
             onFormat('foreColor', newColor);
             setShowTextColors(false);
+        });
+        input.click();
+    };
+
+    const handleAddCustomHighlightColor = () => {
+        const input = document.createElement('input');
+        input.type = 'color';
+        input.value = '#fef08a';
+        input.addEventListener('change', (e) => {
+            const newColor = e.target.value;
+            if (!customHighlightColors.includes(newColor)) {
+                const updatedColors = [...customHighlightColors, newColor].slice(-10); // Keep last 10
+                setCustomHighlightColors(updatedColors);
+                saveCustomColors(CUSTOM_HIGHLIGHT_COLORS_KEY, updatedColors);
+            }
+            onHighlight(newColor);
+            setShowHighlightPicker(false);
         });
         input.click();
     };
@@ -254,7 +290,7 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
                         <div className="mt-2 pt-2 border-t border-gray-200">
                             <div className="text-xs text-gray-500 mb-1.5">CUSTOM</div>
                             <div className="flex items-center gap-1 flex-wrap">
-                                {customColors.map((color, index) => (
+                                {customTextColors.map((color, index) => (
                                     <button
                                         key={index}
                                         onMouseDown={handleMouseDown}
@@ -269,7 +305,7 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
                                 ))}
                                 <button
                                     onMouseDown={handleMouseDown}
-                                    onClick={handleAddCustomColor}
+                                    onClick={handleAddCustomTextColor}
                                     className="w-5 h-5 rounded-full border border-gray-300 hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
                                     title="Añadir color personalizado"
                                 >
@@ -482,8 +518,9 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
             <Divider />
 
             {/* Highlight Colors */}
-            <div className="flex flex-wrap items-center gap-1">
-                {HIGHLIGHT_COLORS.map((color) => (
+            <div className="flex items-center gap-1">
+                {/* Quick access highlight colors */}
+                {HIGHLIGHT_COLORS.slice(0, 5).map((color) => (
                     <button
                         key={color.id}
                         onMouseDown={handleMouseDown}
@@ -496,6 +533,91 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
                         title={`Resaltar ${color.label}`}
                     />
                 ))}
+
+                {/* Extended highlight color picker */}
+                <div className="relative">
+                    <button
+                        onMouseDown={handleMouseDown}
+                        onClick={() => setShowHighlightPicker(!showHighlightPicker)}
+                        className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform flex items-center justify-center bg-gradient-to-br from-yellow-200 via-pink-200 to-blue-200"
+                        title="Más colores de resaltado"
+                    >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M6 9l6 6 6-6" />
+                        </svg>
+                    </button>
+                    {showHighlightPicker && (
+                        <div className="absolute bottom-full mb-1 right-0 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50 min-w-[240px]">
+                            {/* Quick access colors */}
+                            <div className="flex flex-wrap gap-1 mb-2 pb-2 border-b border-gray-200">
+                                {HIGHLIGHT_COLORS.map((color) => (
+                                    <button
+                                        key={color.id}
+                                        onMouseDown={handleMouseDown}
+                                        onClick={() => {
+                                            onHighlight(color.value);
+                                            setShowHighlightPicker(false);
+                                        }}
+                                        className="w-5 h-5 rounded-full border border-gray-300 hover:scale-110 transition-transform"
+                                        style={{ backgroundColor: color.value }}
+                                        title={color.label}
+                                    />
+                                ))}
+                            </div>
+
+                            {/* Extended highlight palette grid */}
+                            <div className="flex flex-col gap-0.5">
+                                {HIGHLIGHT_PALETTE.map((row, rowIndex) => (
+                                    <div key={rowIndex} className="flex gap-0.5">
+                                        {row.map((color, colIndex) => (
+                                            <button
+                                                key={`${rowIndex}-${colIndex}`}
+                                                onMouseDown={handleMouseDown}
+                                                onClick={() => {
+                                                    onHighlight(color);
+                                                    setShowHighlightPicker(false);
+                                                }}
+                                                className="w-5 h-5 rounded-sm hover:scale-110 transition-transform hover:z-10 border border-gray-200"
+                                                style={{ backgroundColor: color }}
+                                                title={color}
+                                            />
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Custom highlight colors section */}
+                            <div className="mt-2 pt-2 border-t border-gray-200">
+                                <div className="text-xs text-gray-500 mb-1.5">CUSTOM</div>
+                                <div className="flex items-center gap-1 flex-wrap">
+                                    {customHighlightColors.map((color, index) => (
+                                        <button
+                                            key={index}
+                                            onMouseDown={handleMouseDown}
+                                            onClick={() => {
+                                                onHighlight(color);
+                                                setShowHighlightPicker(false);
+                                            }}
+                                            className="w-5 h-5 rounded-full border border-gray-300 hover:scale-110 transition-transform"
+                                            style={{ backgroundColor: color }}
+                                            title={color}
+                                        />
+                                    ))}
+                                    <button
+                                        onMouseDown={handleMouseDown}
+                                        onClick={handleAddCustomHighlightColor}
+                                        className="w-5 h-5 rounded-full border border-gray-300 hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+                                        title="Añadir color personalizado"
+                                    >
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M12 5v14M5 12h14" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
             <Divider />
 
