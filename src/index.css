@@ -299,4 +299,135 @@ button {
     .draggable-image.active .delete-button {
         display: flex;
     }
+
+    /* ========================================
+       Editor Table Styles
+       ======================================== */
+
+    .editor-table-wrapper {
+        position: relative;
+        margin: 1em 0;
+        overflow-x: auto;
+    }
+
+    .editor-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+        table-layout: auto;
+    }
+
+    .editor-table td,
+    .editor-table th {
+        border: 1px solid #d1d5db;
+        padding: 8px 12px;
+        min-width: 50px;
+        position: relative;
+        vertical-align: top;
+        text-align: left;
+    }
+
+    .editor-table th {
+        background-color: #f3f4f6;
+        font-weight: 600;
+    }
+
+    .editor-table td:focus,
+    .editor-table th:focus {
+        outline: 2px solid #3b82f6;
+        outline-offset: -2px;
+    }
+
+    /* Row hover effect in edit mode */
+    .topic-content[contenteditable="true"] .editor-table tr:hover td {
+        background-color: #f9fafb;
+    }
+
+    /* Column resize handle */
+    .table-col-resize-handle {
+        position: absolute;
+        top: 0;
+        right: -3px;
+        width: 6px;
+        height: 100%;
+        cursor: col-resize;
+        background: transparent;
+        z-index: 10;
+    }
+
+    .table-col-resize-handle:hover,
+    .table-col-resize-handle.active {
+        background: #3b82f6;
+    }
+
+    /* Row resize handle */
+    .table-row-resize-handle {
+        position: absolute;
+        bottom: -3px;
+        left: 0;
+        width: 100%;
+        height: 6px;
+        cursor: row-resize;
+        background: transparent;
+        z-index: 10;
+    }
+
+    .table-row-resize-handle:hover,
+    .table-row-resize-handle.active {
+        background: #3b82f6;
+    }
+
+    /* Cell selection highlight */
+    .editor-table td.selected,
+    .editor-table th.selected {
+        background-color: #dbeafe !important;
+    }
+
+    /* Table context menu button */
+    .table-menu-btn {
+        position: absolute;
+        top: -28px;
+        right: 0;
+        padding: 4px 8px;
+        background: white;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        gap: 4px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        z-index: 20;
+    }
+
+    .table-menu-btn:hover {
+        background: #f3f4f6;
+    }
+
+    .editor-table-wrapper:hover .table-menu-btn {
+        display: flex;
+    }
+
+    /* Reading mode - clean table appearance */
+    .topic-content:not([contenteditable="true"]) .editor-table tr:hover td {
+        background-color: transparent;
+    }
+
+    .topic-content:not([contenteditable="true"]) .table-col-resize-handle,
+    .topic-content:not([contenteditable="true"]) .table-row-resize-handle,
+    .topic-content:not([contenteditable="true"]) .table-menu-btn {
+        display: none !important;
+    }
+
+    /* Prose table reset for editor tables */
+    .prose .editor-table {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+
+    .prose .editor-table td,
+    .prose .editor-table th {
+        padding: 8px 12px;
+    }
 }

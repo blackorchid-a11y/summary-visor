@@ -41,6 +41,9 @@ export function TopicViewer({ topic, onBack }) {
                         contentRef.current.innerHTML = freshTopic.content;
                         setTimeout(() => {
                             setupAllImageListeners();
+                            // Clear table setup flags so resize handlers are re-added
+                            const tables = contentRef.current.querySelectorAll('.editor-table');
+                            tables.forEach(table => delete table.dataset.resizeSetup);
                         }, 50);
                     }
                 }
@@ -451,8 +454,71 @@ export function TopicViewer({ topic, onBack }) {
         }
     };
 
+    const insertTableAtCursor = useCallback((rows, cols) => {
+        const contentDiv = contentRef.current;
+        if (!contentDiv) return;
+
+        // Create table element
+        const table = document.createElement('table');
+        table.className = 'editor-table';
+        table.style.cssText = 'width: 100%; border-collapse: collapse; margin: 1em 0;';
+
+        // Create tbody
+        const tbody = document.createElement('tbody');
+
+        for (let i = 0; i < rows; i++) {
+            const tr = document.createElement('tr');
+            for (let j = 0; j < cols; j++) {
+                const td = document.createElement('td');
+                td.style.cssText = 'border: 1px solid #d1d5db; padding: 8px 12px; min-width: 50px; position: relative;';
+                td.innerHTML = '<br>'; // Empty cell with line break for editing
+                tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+        }
+
+        table.appendChild(tbody);
+
+        // Create a wrapper div for the table
+        const wrapper = document.createElement('div');
+        wrapper.className = 'editor-table-wrapper';
+        wrapper.style.cssText = 'position: relative; margin: 1em 0; overflow-x: auto;';
+        wrapper.appendChild(table);
+
+        // Insert at cursor position
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            if (contentDiv.contains(range.commonAncestorContainer)) {
+                range.deleteContents();
+                range.insertNode(wrapper);
+
+                // Move cursor after table
+                range.setStartAfter(wrapper);
+                range.setEndAfter(wrapper);
+                selection.removeAllRanges();
+                selection.addRange(range);
+
+                // Add a paragraph after for continued editing
+                const p = document.createElement('p');
+                p.innerHTML = '<br>';
+                wrapper.insertAdjacentElement('afterend', p);
+
+                return;
+            }
+        }
+
+        // Fallback: append to content
+        contentDiv.appendChild(wrapper);
+        const p = document.createElement('p');
+        p.innerHTML = '<br>';
+        contentDiv.appendChild(p);
+    }, []);
+
     const applyFormat = (command, value = null) => {
-        if (command === 'lineHeight') {
+        if (command === 'insertTable') {
+            insertTableAtCursor(value.rows, value.cols);
+        } else if (command === 'lineHeight') {
             applyBlockStyle('lineHeight', value);
         } else if (command === 'paragraphSpacing') {
             const spacing = '1em';
@@ -623,6 +689,117 @@ export function TopicViewer({ topic, onBack }) {
             selectedImage.classList.add('selected');
         }
     }, [selectedImage]);
+
+    // Setup table resize functionality
+    const setupTableResizeHandlers = useCallback(() => {
+        if (!contentRef.current || !isEditMode) return;
+
+        const tables = contentRef.current.querySelectorAll('.editor-table');
+        tables.forEach(table => {
+            // Skip if already setup
+            if (table.dataset.resizeSetup) return;
+            table.dataset.resizeSetup = 'true';
+
+            const cells = table.querySelectorAll('td, th');
+            cells.forEach(cell => {
+                // Add column resize handle
+                if (!cell.querySelector('.table-col-resize-handle')) {
+                    const colHandle = document.createElement('div');
+                    colHandle.className = 'table-col-resize-handle';
+                    colHandle.contentEditable = 'false';
+                    cell.appendChild(colHandle);
+
+                    let startX, startWidth, targetCell;
+
+                    const onMouseDown = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        startX = e.clientX;
+                        targetCell = cell;
+                        startWidth = cell.offsetWidth;
+                        colHandle.classList.add('active');
+
+                        const onMouseMove = (moveE) => {
+                            const diff = moveE.clientX - startX;
+                            const newWidth = Math.max(50, startWidth + diff);
+                            targetCell.style.width = newWidth + 'px';
+                        };
+
+                        const onMouseUp = () => {
+                            colHandle.classList.remove('active');
+                            document.removeEventListener('mousemove', onMouseMove);
+                            document.removeEventListener('mouseup', onMouseUp);
+                        };
+
+                        document.addEventListener('mousemove', onMouseMove);
+                        document.addEventListener('mouseup', onMouseUp);
+                    };
+
+                    colHandle.addEventListener('mousedown', onMouseDown);
+                }
+
+                // Add row resize handle (only to cells in the first column for simplicity)
+                const cellIndex = Array.from(cell.parentElement.children).indexOf(cell);
+                if (cellIndex === 0 && !cell.querySelector('.table-row-resize-handle')) {
+                    const rowHandle = document.createElement('div');
+                    rowHandle.className = 'table-row-resize-handle';
+                    rowHandle.contentEditable = 'false';
+                    cell.appendChild(rowHandle);
+
+                    let startY, startHeight, targetRow;
+
+                    const onMouseDown = (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        startY = e.clientY;
+                        targetRow = cell.parentElement;
+                        startHeight = targetRow.offsetHeight;
+                        rowHandle.classList.add('active');
+
+                        const onMouseMove = (moveE) => {
+                            const diff = moveE.clientY - startY;
+                            const newHeight = Math.max(30, startHeight + diff);
+                            Array.from(targetRow.children).forEach(td => {
+                                td.style.height = newHeight + 'px';
+                            });
+                        };
+
+                        const onMouseUp = () => {
+                            rowHandle.classList.remove('active');
+                            document.removeEventListener('mousemove', onMouseMove);
+                            document.removeEventListener('mouseup', onMouseUp);
+                        };
+
+                        document.addEventListener('mousemove', onMouseMove);
+                        document.addEventListener('mouseup', onMouseUp);
+                    };
+
+                    rowHandle.addEventListener('mousedown', onMouseDown);
+                }
+            });
+        });
+    }, [isEditMode]);
+
+    // Setup table resize handlers when content changes or edit mode changes
+    useEffect(() => {
+        setupTableResizeHandlers();
+    }, [isEditMode, setupTableResizeHandlers]);
+
+    // Also setup after table insertion
+    useEffect(() => {
+        if (!contentRef.current) return;
+
+        const observer = new MutationObserver(() => {
+            setupTableResizeHandlers();
+        });
+
+        observer.observe(contentRef.current, {
+            childList: true,
+            subtree: true
+        });
+
+        return () => observer.disconnect();
+    }, [setupTableResizeHandlers]);
 
     return (
         <div className="min-h-screen bg-white">
