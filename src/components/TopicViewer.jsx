@@ -6,9 +6,9 @@ import mermaid from 'mermaid';
 
 mermaid.initialize({
     startOnLoad: false,
-    theme: 'default',
+    theme: 'neutral',
     securityLevel: 'loose',
-    fontFamily: 'inherit',
+    fontFamily: 'Nunito, sans-serif',
 });
 
 export function TopicViewer({ topic, onBack }) {
@@ -16,7 +16,7 @@ export function TopicViewer({ topic, onBack }) {
     const editorContainerRef = useRef(null);
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState(null);
-    const [mermaidTheme, setMermaidTheme] = useState('default');
+    const [mermaidTheme, setMermaidTheme] = useState('neutral');
     const [isReadingMode, setIsReadingMode] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
@@ -37,27 +37,28 @@ export function TopicViewer({ topic, onBack }) {
                 const freshTopic = await getTopic(topic.id);
                 if (freshTopic) {
                     setCurrentTopic(freshTopic);
-                    if (contentRef.current) {
-                        contentRef.current.innerHTML = freshTopic.content;
-                        setTimeout(() => {
-                            setupAllImageListeners();
-                            // Clear table setup flags so resize handlers are re-added
-                            const tables = contentRef.current.querySelectorAll('.editor-table');
-                            tables.forEach(table => delete table.dataset.resizeSetup);
-                        }, 50);
-                    }
+                } else {
+                    setCurrentTopic(topic);
                 }
             } catch (error) {
                 console.error('Error loading topic from DB:', error);
-                if (contentRef.current) {
-                    contentRef.current.innerHTML = topic.content;
-                }
+                setCurrentTopic(topic);
             }
         };
 
         window.scrollTo(0, 0);
         loadTopicFromDB();
     }, [topic.id]);
+
+    // Update DOM when currentTopic changes
+    useEffect(() => {
+        if (contentRef.current && currentTopic.content) {
+            contentRef.current.innerHTML = currentTopic.content;
+            // Clear table setup flags so resize handlers are re-added
+            const tables = contentRef.current.querySelectorAll('.editor-table');
+            tables.forEach(table => delete table.dataset.resizeSetup);
+        }
+    }, [currentTopic.id, currentTopic.content]);
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -157,7 +158,7 @@ export function TopicViewer({ topic, onBack }) {
                         startOnLoad: false,
                         theme: mermaidTheme,
                         securityLevel: 'loose',
-                        fontFamily: 'inherit',
+                        fontFamily: 'Nunito, sans-serif',
                     });
 
                     try {
@@ -172,7 +173,9 @@ export function TopicViewer({ topic, onBack }) {
             }
         };
 
-        initMermaid();
+        // Delay to ensure DOM is ready after innerHTML update
+        const timer = setTimeout(initMermaid, 150);
+        return () => clearTimeout(timer);
     }, [currentTopic.content, mermaidTheme]);
 
     // Setup drag functionality for a floating image

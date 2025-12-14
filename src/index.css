@@ -12,6 +12,109 @@ body {
     overscroll-behavior-y: none;
 }
 
+/* Topic content font */
+.topic-content {
+    font-family: 'Nunito', sans-serif;
+    line-height: 1.5;
+    color: #1a1a1a;
+}
+
+/* Mermaid diagram container */
+.topic-content .mermaid {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0;
+    background: #fcfcfc;
+    padding: 15px;
+    border: 1px dashed #ccc;
+    border-radius: 8px;
+}
+
+/* Semantic classes from imported HTML */
+.topic-content .patologia { color: #C41E3A; font-weight: 700; }
+.topic-content .farmaco { color: #006400; font-weight: 700; }
+.topic-content .dato-lab { background-color: #FFEBEE; color: #000; padding: 1px 4px; border-radius: 4px; font-weight: 600; }
+.topic-content .clinica { color: #8B4513; font-weight: 600; }
+.topic-content .genetica { color: #C71585; font-weight: 600; }
+.topic-content .eponimo { color: #0047AB; font-weight: 600; }
+.topic-content .mir-high { background-color: #FFD700; color: #000; padding: 2px 4px; border-radius: 3px; font-weight: 800; }
+.topic-content .enzima { color: #6A0DAD; font-weight: 600; }
+.topic-content .molecula { color: #008B8B; font-weight: 600; }
+
+/* Info boxes */
+.topic-content .enfoque-mir {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
+    border-left: 5px solid #ffc107;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+}
+
+.topic-content .recuerda {
+    background: #e8f4fd;
+    border-left: 5px solid #2196F3;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 0 8px 8px 0;
+}
+
+.topic-content .formula {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 10px 15px;
+    margin: 10px 0;
+    border-radius: 5px;
+    font-family: monospace;
+    text-align: center;
+}
+
+/* Tables from imported HTML */
+.topic-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 0.95em;
+}
+
+.topic-content th {
+    background-color: #2c3e50;
+    color: #fff;
+    padding: 10px;
+    text-align: left;
+}
+
+.topic-content td {
+    border-bottom: 1px solid #eee;
+    padding: 10px;
+    vertical-align: top;
+}
+
+.topic-content tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+/* Headings from imported HTML */
+.topic-content h2 {
+    color: #000;
+    border-left: 6px solid #C41E3A;
+    padding-left: 10px;
+    margin-top: 30px;
+    background: linear-gradient(90deg, #fff0f0 0%, #ffffff 100%);
+}
+
+.topic-content h3 {
+    color: #333;
+    text-decoration: underline;
+    text-decoration-color: #ddd;
+    margin-top: 20px;
+}
+
+.topic-content h4 {
+    color: #555;
+    margin-top: 15px;
+    margin-bottom: 10px;
+}
+
 input,
 textarea,
 select,

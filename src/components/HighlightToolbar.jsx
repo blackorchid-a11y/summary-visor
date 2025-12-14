@@ -547,7 +547,7 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
                         </svg>
                     </button>
                     {showHighlightPicker && (
-                        <div className="absolute bottom-full mb-1 right-0 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50 min-w-[240px]">
+                        <div className="absolute top-full mt-1 right-0 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50 min-w-[240px]">
                             {/* Quick access colors */}
                             <div className="flex flex-wrap gap-1 mb-2 pb-2 border-b border-gray-200">
                                 {HIGHLIGHT_COLORS.map((color) => (
