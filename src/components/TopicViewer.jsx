@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { ArrowLeft, Save, BookOpen, X } from 'lucide-react';
+import { ArrowLeft, Save, BookOpen, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { HighlightToolbar } from './HighlightToolbar';
 import { saveTopic, getTopic } from '../lib/db';
+import { isIOSDevice, isLandscape } from '../lib/utils';
 import mermaid from 'mermaid';
 
 mermaid.initialize({
@@ -21,6 +22,8 @@ export function TopicViewer({ topic, onBack }) {
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
     const [currentTopic, setCurrentTopic] = useState(topic);
+    const [isToolbarVisible, setIsToolbarVisible] = useState(true);
+    const [isIOSLandscape, setIsIOSLandscape] = useState(false);
 
     const dragStateRef = useRef({
         isDragging: false,
@@ -30,6 +33,27 @@ export function TopicViewer({ topic, onBack }) {
         startTop: 0,
         element: null
     });
+
+    // Detect iOS landscape mode for collapsible toolbar
+    useEffect(() => {
+        const checkIOSLandscape = () => {
+            const iosLandscape = isIOSDevice() && isLandscape();
+            setIsIOSLandscape(iosLandscape);
+            // Hide toolbar by default in iOS landscape edit mode
+            if (iosLandscape && isEditMode) {
+                setIsToolbarVisible(false);
+            }
+        };
+
+        checkIOSLandscape();
+        window.addEventListener('resize', checkIOSLandscape);
+        window.addEventListener('orientationchange', checkIOSLandscape);
+
+        return () => {
+            window.removeEventListener('resize', checkIOSLandscape);
+            window.removeEventListener('orientationchange', checkIOSLandscape);
+        };
+    }, [isEditMode]);
 
     useEffect(() => {
         const loadTopicFromDB = async () => {
@@ -807,21 +831,21 @@ export function TopicViewer({ topic, onBack }) {
     return (
         <div className="min-h-screen bg-white">
             {!isReadingMode && (
-                <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-200 px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] flex items-center justify-between shadow-sm">
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className={`sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-200 flex items-center justify-between shadow-sm ${isIOSLandscape ? 'ios-landscape-header px-2 py-1 pt-[calc(0.25rem+env(safe-area-inset-top))]' : 'px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))]'}`}>
+                    <div className={`flex items-center flex-1 min-w-0 ${isIOSLandscape ? 'gap-2' : 'gap-4'}`}>
                         <button
                             onClick={onBack}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
+                            className={`hover:bg-gray-100 rounded-full transition-colors text-gray-600 ${isIOSLandscape ? 'p-1' : 'p-2'}`}
                             title="Volver"
                         >
-                            <ArrowLeft size={24} />
+                            <ArrowLeft size={isIOSLandscape ? 20 : 24} />
                         </button>
-                        <h1 className="text-xl font-bold text-gray-900 truncate">
+                        <h1 className={`font-bold text-gray-900 truncate ${isIOSLandscape ? 'text-base' : 'text-xl'}`}>
                             {currentTopic.title}
                         </h1>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className={`flex items-center ${isIOSLandscape ? 'gap-1' : 'gap-3'}`}>
                         {lastSaved && (
                             <span className="text-xs text-gray-500 hidden sm:inline">
                                 Guardado: {lastSaved.toLocaleTimeString()}
@@ -830,7 +854,7 @@ export function TopicViewer({ topic, onBack }) {
                         {!isEditMode && (
                             <button
                                 onClick={() => setIsEditMode(true)}
-                                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow"
+                                className={`flex items-center gap-2 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow ${isIOSLandscape ? 'px-2 py-1 text-sm' : 'px-4 py-2'}`}
                                 title="Modo edición"
                             >
                                 <span className="hidden sm:inline">Editar</span>
@@ -838,10 +862,10 @@ export function TopicViewer({ topic, onBack }) {
                         )}
                         <button
                             onClick={() => setIsReadingMode(true)}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow"
+                            className={`flex items-center gap-2 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow ${isIOSLandscape ? 'px-2 py-1 text-sm' : 'px-4 py-2'}`}
                             title="Modo lectura"
                         >
-                            <BookOpen size={18} />
+                            <BookOpen size={isIOSLandscape ? 16 : 18} />
                             <span className="hidden sm:inline">Lectura</span>
                         </button>
                         {isEditMode && (
@@ -849,14 +873,15 @@ export function TopicViewer({ topic, onBack }) {
                                 onClick={handleSave}
                                 disabled={isSaving}
                                 className={`
-                                    flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all
+                                    flex items-center gap-2 rounded-lg font-medium transition-all
+                                    ${isIOSLandscape ? 'px-2 py-1 text-sm' : 'px-4 py-2'}
                                     ${isSaving
                                         ? 'bg-green-100 text-green-700'
                                         : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow'
                                     }
                                 `}
                             >
-                                <Save size={18} />
+                                <Save size={isIOSLandscape ? 16 : 18} />
                                 {isSaving ? 'Guardado!' : 'Guardar'}
                             </button>
                         )}
@@ -866,7 +891,7 @@ export function TopicViewer({ topic, onBack }) {
 
             <div
                 ref={editorContainerRef}
-                className="max-w-4xl mx-auto p-8 sm:p-12 relative"
+                className={`mx-auto relative ${isIOSLandscape ? 'ios-landscape-editor px-2 py-4 max-w-none' : 'max-w-4xl px-3 py-4 sm:px-8 sm:py-8 lg:px-12 lg:py-12'}`}
                 style={{ position: 'relative', minHeight: '80vh' }}
             >
                 {isReadingMode && (
@@ -880,11 +905,43 @@ export function TopicViewer({ topic, onBack }) {
                 )}
 
                 {!isReadingMode && isEditMode && (
-                    <HighlightToolbar
-                        onHighlight={handleHighlight}
-                        onFormat={handleFormat}
-                        onInsertImage={handleImageInsert}
-                    />
+                    <>
+                        {/* iOS Landscape: Collapsible toolbar */}
+                        {isIOSLandscape ? (
+                            <div className="ios-toolbar-container">
+                                <button
+                                    onClick={() => setIsToolbarVisible(!isToolbarVisible)}
+                                    className="ios-toolbar-toggle flex items-center justify-center gap-2 w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 text-sm font-medium transition-colors mb-2"
+                                >
+                                    {isToolbarVisible ? (
+                                        <>
+                                            <ChevronUp size={16} />
+                                            Ocultar herramientas
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ChevronDown size={16} />
+                                            Mostrar herramientas
+                                        </>
+                                    )}
+                                </button>
+                                {isToolbarVisible && (
+                                    <HighlightToolbar
+                                        onHighlight={handleHighlight}
+                                        onFormat={handleFormat}
+                                        onInsertImage={handleImageInsert}
+                                        className="ios-landscape-toolbar"
+                                    />
+                                )}
+                            </div>
+                        ) : (
+                            <HighlightToolbar
+                                onHighlight={handleHighlight}
+                                onFormat={handleFormat}
+                                onInsertImage={handleImageInsert}
+                            />
+                        )}
+                    </>
                 )}
 
                 <div

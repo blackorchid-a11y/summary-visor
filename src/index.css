@@ -533,4 +533,82 @@ button {
     .prose .editor-table th {
         padding: 8px 12px;
     }
+
+    /* ========================================
+       iOS Landscape Mode - Optimized Editing
+       ======================================== */
+
+    /* Container adjustments for iOS landscape */
+    .ios-landscape-editor {
+        padding: 8px !important;
+        max-width: 100% !important;
+    }
+
+    /* Toolbar container for iOS */
+    .ios-toolbar-container {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        background: white;
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+    }
+
+    /* Toggle button styling */
+    .ios-toolbar-toggle {
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Compact toolbar for iOS landscape */
+    .ios-landscape-toolbar {
+        max-height: 120px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Smaller toolbar buttons on iOS landscape */
+    .ios-landscape-toolbar button {
+        padding: 4px !important;
+    }
+
+    .ios-landscape-toolbar .w-6 {
+        width: 20px !important;
+        height: 20px !important;
+    }
+}
+
+/* ========================================
+   Mobile-specific optimizations
+   Reduces margins and maximizes content width
+   ======================================== */
+
+@media screen and (max-width: 640px) {
+    /* Reduce header padding on mobile */
+    .sticky.top-0 {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+
+    /* Make content use more screen width on mobile */
+    .max-w-4xl {
+        max-width: 100% !important;
+    }
+
+    /* Reduce prose margins for mobile */
+    .prose {
+        max-width: 100% !important;
+    }
+
+    .prose h2,
+    .prose h3,
+    .prose h4 {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    /* Tighter padding for topic content on mobile */
+    .topic-content {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
 }
