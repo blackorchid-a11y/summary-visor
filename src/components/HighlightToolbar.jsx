@@ -97,7 +97,29 @@ const HIGHLIGHT_PALETTE = [
     ['#d9ead3', '#b6d7a8', '#93c47d', '#a3e635', '#84cc16', '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9'],
 ];
 
-export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImage, className }) {
+// Storage key for highlight mode preference
+const HIGHLIGHT_MODE_KEY = 'highlight-toolbar-persistent-mode';
+
+// Load highlight mode preference from localStorage
+const loadHighlightMode = () => {
+    try {
+        const stored = localStorage.getItem(HIGHLIGHT_MODE_KEY);
+        return stored === 'true';
+    } catch {
+        return true; // Default to persistent mode
+    }
+};
+
+// Save highlight mode preference to localStorage
+const saveHighlightMode = (isPersistent) => {
+    try {
+        localStorage.setItem(HIGHLIGHT_MODE_KEY, isPersistent.toString());
+    } catch {
+        // Ignore storage errors
+    }
+};
+
+export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImage, className, activeHighlightColor, onHighlightModeChange }) {
     const [showTextColors, setShowTextColors] = useState(false);
     const [showFontSizes, setShowFontSizes] = useState(false);
     const [showLineHeight, setShowLineHeight] = useState(false);
@@ -108,6 +130,41 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
     const [showTablePicker, setShowTablePicker] = useState(false);
     const [tableHover, setTableHover] = useState({ rows: 0, cols: 0 });
     const [showHighlightPicker, setShowHighlightPicker] = useState(false);
+    const [isPersistentMode, setIsPersistentMode] = useState(() => loadHighlightMode());
+
+    // Función para manejar click en color de highlight
+    const handleHighlightColorClick = (color) => {
+        if (isPersistentMode) {
+            // Modo persistente: toggle on/off
+            if (activeHighlightColor === color) {
+                onHighlightModeChange(null);
+            } else {
+                onHighlightModeChange(color);
+            }
+        } else {
+            // Modo clásico: aplicar directamente al texto seleccionado
+            onHighlight(color);
+        }
+    };
+
+    // Toggle entre modo persistente y clásico
+    const toggleHighlightMode = () => {
+        const newMode = !isPersistentMode;
+        setIsPersistentMode(newMode);
+        saveHighlightMode(newMode);
+        // Si desactivamos el modo persistente, también desactivamos cualquier color activo
+        if (!newMode && activeHighlightColor) {
+            onHighlightModeChange(null);
+        }
+    };
+
+    // Función para desactivar el modo highlight cuando se usa otra herramienta
+    const handleOtherToolClick = (callback) => {
+        if (activeHighlightColor) {
+            onHighlightModeChange(null);
+        }
+        callback();
+    };
 
     const style = position ? {
         position: 'fixed',
@@ -149,7 +206,7 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
                 setCustomHighlightColors(updatedColors);
                 saveCustomColors(CUSTOM_HIGHLIGHT_COLORS_KEY, updatedColors);
             }
-            onHighlight(newColor);
+            handleHighlightColorClick(newColor);
             setShowHighlightPicker(false);
         });
         input.click();
@@ -517,8 +574,35 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
             </div>
             <Divider />
 
-            {/* Highlight Colors */}
+            {/* Highlight Mode Toggle + Colors */}
             <div className="flex items-center gap-1">
+                {/* Toggle button for persistent/classic mode */}
+                <button
+                    onMouseDown={handleMouseDown}
+                    onClick={toggleHighlightMode}
+                    className={cn(
+                        "p-1.5 rounded transition-all flex items-center justify-center",
+                        isPersistentMode
+                            ? "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    )}
+                    title={isPersistentMode ? "Modo subrayador activo (click para modo clásico)" : "Modo clásico (click para modo subrayador)"}
+                >
+                    {isPersistentMode ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 19l7-7 3 3-7 7-3-3z" />
+                            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+                            <path d="M2 2l7.586 7.586" />
+                            <circle cx="11" cy="11" r="2" />
+                        </svg>
+                    ) : (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                    )}
+                </button>
+
                 {/* Quick access highlight colors */}
                 {HIGHLIGHT_COLORS.slice(0, 5).map((color) => (
                     <button
@@ -526,11 +610,19 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
                         onMouseDown={handleMouseDown}
                         onClick={(e) => {
                             e.stopPropagation();
-                            onHighlight(color.value);
+                            handleHighlightColorClick(color.value);
                         }}
-                        className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform"
+                        className={cn(
+                            "w-6 h-6 rounded-full border-2 hover:scale-110 transition-all",
+                            isPersistentMode && activeHighlightColor === color.value
+                                ? "border-gray-800 ring-2 ring-gray-400 ring-offset-1 scale-110"
+                                : "border-gray-300"
+                        )}
                         style={{ backgroundColor: color.value }}
-                        title={`Resaltar ${color.label}`}
+                        title={isPersistentMode
+                            ? (activeHighlightColor === color.value ? `Desactivar ${color.label}` : `Activar subrayador ${color.label}`)
+                            : `Resaltar ${color.label}`
+                        }
                     />
                 ))}
 
@@ -539,7 +631,12 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
                     <button
                         onMouseDown={handleMouseDown}
                         onClick={() => setShowHighlightPicker(!showHighlightPicker)}
-                        className="w-6 h-6 rounded-full border border-gray-300 hover:scale-110 transition-transform flex items-center justify-center bg-gradient-to-br from-yellow-200 via-pink-200 to-blue-200"
+                        className={cn(
+                            "w-6 h-6 rounded-full border-2 hover:scale-110 transition-all flex items-center justify-center bg-gradient-to-br from-yellow-200 via-pink-200 to-blue-200",
+                            isPersistentMode && activeHighlightColor && !HIGHLIGHT_COLORS.slice(0, 5).some(c => c.value === activeHighlightColor)
+                                ? "border-gray-800 ring-2 ring-gray-400 ring-offset-1"
+                                : "border-gray-300"
+                        )}
                         title="Más colores de resaltado"
                     >
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -555,10 +652,15 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
                                         key={color.id}
                                         onMouseDown={handleMouseDown}
                                         onClick={() => {
-                                            onHighlight(color.value);
+                                            handleHighlightColorClick(color.value);
                                             setShowHighlightPicker(false);
                                         }}
-                                        className="w-5 h-5 rounded-full border border-gray-300 hover:scale-110 transition-transform"
+                                        className={cn(
+                                            "w-5 h-5 rounded-full border-2 hover:scale-110 transition-all",
+                                            isPersistentMode && activeHighlightColor === color.value
+                                                ? "border-gray-800 ring-1 ring-gray-400"
+                                                : "border-gray-300"
+                                        )}
                                         style={{ backgroundColor: color.value }}
                                         title={color.label}
                                     />
@@ -574,10 +676,15 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
                                                 key={`${rowIndex}-${colIndex}`}
                                                 onMouseDown={handleMouseDown}
                                                 onClick={() => {
-                                                    onHighlight(color);
+                                                    handleHighlightColorClick(color);
                                                     setShowHighlightPicker(false);
                                                 }}
-                                                className="w-5 h-5 rounded-sm hover:scale-110 transition-transform hover:z-10 border border-gray-200"
+                                                className={cn(
+                                                    "w-5 h-5 rounded-sm hover:scale-110 transition-all hover:z-10",
+                                                    isPersistentMode && activeHighlightColor === color
+                                                        ? "border-2 border-gray-800 ring-1 ring-gray-400"
+                                                        : "border border-gray-200"
+                                                )}
                                                 style={{ backgroundColor: color }}
                                                 title={color}
                                             />
@@ -595,10 +702,15 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
                                             key={index}
                                             onMouseDown={handleMouseDown}
                                             onClick={() => {
-                                                onHighlight(color);
+                                                handleHighlightColorClick(color);
                                                 setShowHighlightPicker(false);
                                             }}
-                                            className="w-5 h-5 rounded-full border border-gray-300 hover:scale-110 transition-transform"
+                                            className={cn(
+                                                "w-5 h-5 rounded-full border-2 hover:scale-110 transition-all",
+                                                isPersistentMode && activeHighlightColor === color
+                                                    ? "border-gray-800 ring-1 ring-gray-400"
+                                                    : "border-gray-300"
+                                            )}
                                             style={{ backgroundColor: color }}
                                             title={color}
                                         />
@@ -626,6 +738,9 @@ export function HighlightToolbar({ position, onHighlight, onFormat, onInsertImag
                 onMouseDown={handleMouseDown}
                 onClick={(e) => {
                     e.stopPropagation();
+                    if (activeHighlightColor) {
+                        onHighlightModeChange(null);
+                    }
                     onHighlight(null); // Clear format
                 }}
                 className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"

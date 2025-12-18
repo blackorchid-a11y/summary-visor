@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { ArrowLeft, Save, BookOpen, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Save, BookOpen, X, ChevronDown, ChevronUp, Monitor } from 'lucide-react';
 import { HighlightToolbar } from './HighlightToolbar';
 import { saveTopic, getTopic } from '../lib/db';
 import { isIOSDevice, isLandscape } from '../lib/utils';
@@ -24,6 +24,10 @@ export function TopicViewer({ topic, onBack }) {
     const [currentTopic, setCurrentTopic] = useState(topic);
     const [isToolbarVisible, setIsToolbarVisible] = useState(true);
     const [isIOSLandscape, setIsIOSLandscape] = useState(false);
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    const [activeHighlightColor, setActiveHighlightColor] = useState(null);
+    const [pageWidth, setPageWidth] = useState('1400px'); // Will be set from topic
+    const [showWidthMenu, setShowWidthMenu] = useState(false);
 
     const dragStateRef = useRef({
         isDragging: false,
@@ -34,24 +38,25 @@ export function TopicViewer({ topic, onBack }) {
         element: null
     });
 
-    // Detect iOS landscape mode for collapsible toolbar
+    // Detect iOS landscape mode and mobile for layout adjustments
     useEffect(() => {
-        const checkIOSLandscape = () => {
+        const checkLayout = () => {
             const iosLandscape = isIOSDevice() && isLandscape();
             setIsIOSLandscape(iosLandscape);
+            setIsMobile(window.innerWidth <= 768);
             // Hide toolbar by default in iOS landscape edit mode
             if (iosLandscape && isEditMode) {
                 setIsToolbarVisible(false);
             }
         };
 
-        checkIOSLandscape();
-        window.addEventListener('resize', checkIOSLandscape);
-        window.addEventListener('orientationchange', checkIOSLandscape);
+        checkLayout();
+        window.addEventListener('resize', checkLayout);
+        window.addEventListener('orientationchange', checkLayout);
 
         return () => {
-            window.removeEventListener('resize', checkIOSLandscape);
-            window.removeEventListener('orientationchange', checkIOSLandscape);
+            window.removeEventListener('resize', checkLayout);
+            window.removeEventListener('orientationchange', checkLayout);
         };
     }, [isEditMode]);
 
@@ -61,12 +66,16 @@ export function TopicViewer({ topic, onBack }) {
                 const freshTopic = await getTopic(topic.id);
                 if (freshTopic) {
                     setCurrentTopic(freshTopic);
+                    // Set page width from topic, fallback to default
+                    setPageWidth(freshTopic.pageWidth || '1400px');
                 } else {
                     setCurrentTopic(topic);
+                    setPageWidth(topic.pageWidth || '1400px');
                 }
             } catch (error) {
                 console.error('Error loading topic from DB:', error);
                 setCurrentTopic(topic);
+                setPageWidth(topic.pageWidth || '1400px');
             }
         };
 
@@ -78,9 +87,6 @@ export function TopicViewer({ topic, onBack }) {
     useEffect(() => {
         if (contentRef.current && currentTopic.content) {
             contentRef.current.innerHTML = currentTopic.content;
-            // Clear table setup flags so resize handlers are re-added
-            const tables = contentRef.current.querySelectorAll('.editor-table');
-            tables.forEach(table => delete table.dataset.resizeSetup);
         }
     }, [currentTopic.id, currentTopic.content]);
 
@@ -420,7 +426,7 @@ export function TopicViewer({ topic, onBack }) {
 
     useEffect(() => {
         setupAllImageListeners();
-    }, [isEditMode, setupAllImageListeners]);
+    }, [isEditMode, setupAllImageListeners, currentTopic.content]);
 
     const handleInput = async () => {
         // Auto-save logic removed
@@ -723,64 +729,63 @@ export function TopicViewer({ topic, onBack }) {
 
         const tables = contentRef.current.querySelectorAll('.editor-table');
         tables.forEach(table => {
-            // Skip if already setup
-            if (table.dataset.resizeSetup) return;
-            table.dataset.resizeSetup = 'true';
-
             const cells = table.querySelectorAll('td, th');
             cells.forEach(cell => {
-                // Add column resize handle
-                if (!cell.querySelector('.table-col-resize-handle')) {
-                    const colHandle = document.createElement('div');
-                    colHandle.className = 'table-col-resize-handle';
-                    colHandle.contentEditable = 'false';
-                    cell.appendChild(colHandle);
-
-                    let startX, startWidth, targetCell;
-
-                    const onMouseDown = (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        startX = e.clientX;
-                        targetCell = cell;
-                        startWidth = cell.offsetWidth;
-                        colHandle.classList.add('active');
-
-                        const onMouseMove = (moveE) => {
-                            const diff = moveE.clientX - startX;
-                            const newWidth = Math.max(50, startWidth + diff);
-                            targetCell.style.width = newWidth + 'px';
-                        };
-
-                        const onMouseUp = () => {
-                            colHandle.classList.remove('active');
-                            document.removeEventListener('mousemove', onMouseMove);
-                            document.removeEventListener('mouseup', onMouseUp);
-                        };
-
-                        document.addEventListener('mousemove', onMouseMove);
-                        document.addEventListener('mouseup', onMouseUp);
-                    };
-
-                    colHandle.addEventListener('mousedown', onMouseDown);
+                // Remove existing column resize handle (and its event listeners) before adding new one
+                const existingColHandle = cell.querySelector('.table-col-resize-handle');
+                if (existingColHandle) {
+                    existingColHandle.remove();
                 }
 
-                // Add row resize handle (only to cells in the first column for simplicity)
+                // Add column resize handle
+                const colHandle = document.createElement('div');
+                colHandle.className = 'table-col-resize-handle';
+                colHandle.contentEditable = 'false';
+                cell.appendChild(colHandle);
+
+                colHandle.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const startX = e.clientX;
+                    const startWidth = cell.offsetWidth;
+                    colHandle.classList.add('active');
+
+                    const onMouseMove = (moveE) => {
+                        const diff = moveE.clientX - startX;
+                        const newWidth = Math.max(50, startWidth + diff);
+                        cell.style.width = newWidth + 'px';
+                    };
+
+                    const onMouseUp = () => {
+                        colHandle.classList.remove('active');
+                        document.removeEventListener('mousemove', onMouseMove);
+                        document.removeEventListener('mouseup', onMouseUp);
+                    };
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                });
+
+                // Add row resize handle (only to cells in the first column)
                 const cellIndex = Array.from(cell.parentElement.children).indexOf(cell);
-                if (cellIndex === 0 && !cell.querySelector('.table-row-resize-handle')) {
+                if (cellIndex === 0) {
+                    // Remove existing row resize handle before adding new one
+                    const existingRowHandle = cell.querySelector('.table-row-resize-handle');
+                    if (existingRowHandle) {
+                        existingRowHandle.remove();
+                    }
+
                     const rowHandle = document.createElement('div');
                     rowHandle.className = 'table-row-resize-handle';
                     rowHandle.contentEditable = 'false';
                     cell.appendChild(rowHandle);
 
-                    let startY, startHeight, targetRow;
-
-                    const onMouseDown = (e) => {
+                    rowHandle.addEventListener('mousedown', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        startY = e.clientY;
-                        targetRow = cell.parentElement;
-                        startHeight = targetRow.offsetHeight;
+                        const startY = e.clientY;
+                        const targetRow = cell.parentElement;
+                        const startHeight = targetRow.offsetHeight;
                         rowHandle.classList.add('active');
 
                         const onMouseMove = (moveE) => {
@@ -799,9 +804,7 @@ export function TopicViewer({ topic, onBack }) {
 
                         document.addEventListener('mousemove', onMouseMove);
                         document.addEventListener('mouseup', onMouseUp);
-                    };
-
-                    rowHandle.addEventListener('mousedown', onMouseDown);
+                    });
                 }
             });
         });
@@ -811,6 +814,89 @@ export function TopicViewer({ topic, onBack }) {
     useEffect(() => {
         setupTableResizeHandlers();
     }, [isEditMode, setupTableResizeHandlers]);
+
+    // Listener para aplicar highlight automáticamente cuando hay modo highlight activo
+    useEffect(() => {
+        if (!isEditMode || !activeHighlightColor) return;
+
+        const handleSelectionChange = () => {
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed || !selection.toString().trim()) return;
+
+            // Verificar que la selección está dentro del editor
+            const contentDiv = contentRef.current;
+            if (!contentDiv) return;
+
+            const range = selection.getRangeAt(0);
+            if (!contentDiv.contains(range.commonAncestorContainer)) return;
+
+            // Aplicar el highlight
+            document.execCommand('styleWithCSS', false, true);
+            document.execCommand('hiliteColor', false, activeHighlightColor);
+
+            // Colapsar la selección después de aplicar (opcional, para UX más fluida)
+            selection.collapseToEnd();
+        };
+
+        // Usamos mouseup en vez de selectionchange para mejor control
+        const handleMouseUp = (e) => {
+            // Pequeño delay para asegurar que la selección se completó
+            setTimeout(handleSelectionChange, 10);
+        };
+
+        const contentDiv = contentRef.current;
+        if (contentDiv) {
+            contentDiv.addEventListener('mouseup', handleMouseUp);
+            return () => contentDiv.removeEventListener('mouseup', handleMouseUp);
+        }
+    }, [isEditMode, activeHighlightColor]);
+
+    // Desactivar modo highlight cuando se sale del modo edición
+    useEffect(() => {
+        if (!isEditMode) {
+            setActiveHighlightColor(null);
+        }
+    }, [isEditMode]);
+
+    // Guardar preferencia de ancho de página por documento
+    const handleWidthChange = async (width) => {
+        setPageWidth(width);
+        setShowWidthMenu(false);
+
+        // Save to current topic in database
+        try {
+            const updatedTopic = {
+                ...currentTopic,
+                pageWidth: width,
+                lastModified: Date.now()
+            };
+            await saveTopic(updatedTopic);
+            setCurrentTopic(updatedTopic);
+        } catch (error) {
+            console.error('Error saving page width:', error);
+        }
+    };
+
+    // Cerrar menú de ancho al hacer clic afuera
+    useEffect(() => {
+        if (!showWidthMenu) return;
+
+        const handleClickOutside = (e) => {
+            if (!e.target.closest('.width-menu-container')) {
+                setShowWidthMenu(false);
+            }
+        };
+
+        // Pequeño delay para evitar que el clic que abre el menú también lo cierre
+        const timeoutId = setTimeout(() => {
+            document.addEventListener('click', handleClickOutside);
+        }, 0);
+
+        return () => {
+            clearTimeout(timeoutId);
+            document.removeEventListener('click', handleClickOutside);
+        };
+    }, [showWidthMenu]);
 
     // Also setup after table insertion
     useEffect(() => {
@@ -831,7 +917,15 @@ export function TopicViewer({ topic, onBack }) {
     return (
         <div className="min-h-screen bg-white">
             {!isReadingMode && (
-                <div className={`sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-200 flex items-center justify-between shadow-sm ${isIOSLandscape ? 'ios-landscape-header px-2 py-1 pt-[calc(0.25rem+env(safe-area-inset-top))]' : 'px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))]'}`}>
+                <div
+                    className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-200 flex items-center justify-between shadow-sm"
+                    style={{
+                        paddingLeft: isMobile ? '6px' : '16px',
+                        paddingRight: isMobile ? '6px' : '16px',
+                        paddingTop: isMobile ? 'calc(4px + env(safe-area-inset-top))' : 'calc(12px + env(safe-area-inset-top))',
+                        paddingBottom: isMobile ? '4px' : '12px'
+                    }}
+                >
                     <div className={`flex items-center flex-1 min-w-0 ${isIOSLandscape ? 'gap-2' : 'gap-4'}`}>
                         <button
                             onClick={onBack}
@@ -859,6 +953,53 @@ export function TopicViewer({ topic, onBack }) {
                             >
                                 <span className="hidden sm:inline">Editar</span>
                             </button>
+                        )}
+                        {!isMobile && (
+                            <div className="relative width-menu-container">
+                                <button
+                                    onClick={() => setShowWidthMenu(!showWidthMenu)}
+                                    className={`flex items-center gap-2 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow ${isIOSLandscape ? 'px-2 py-1 text-sm' : 'px-4 py-2'}`}
+                                    title="Ancho de página"
+                                >
+                                    <Monitor size={isIOSLandscape ? 16 : 18} />
+                                    <span className="hidden md:inline">Ancho</span>
+                                </button>
+                                {showWidthMenu && (
+                                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 border-b border-gray-100">
+                                            Ancho de página
+                                        </div>
+                                        <button
+                                            onClick={() => handleWidthChange('900px')}
+                                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${pageWidth === '900px' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
+                                        >
+                                            <div className="font-medium">Estrecho</div>
+                                            <div className="text-xs text-gray-500">900px - lectura concentrada</div>
+                                        </button>
+                                        <button
+                                            onClick={() => handleWidthChange('1100px')}
+                                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${pageWidth === '1100px' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
+                                        >
+                                            <div className="font-medium">Moderado</div>
+                                            <div className="text-xs text-gray-500">1100px</div>
+                                        </button>
+                                        <button
+                                            onClick={() => handleWidthChange('1400px')}
+                                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${pageWidth === '1400px' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
+                                        >
+                                            <div className="font-medium">Amplio</div>
+                                            <div className="text-xs text-gray-500">1400px (recomendado)</div>
+                                        </button>
+                                        <button
+                                            onClick={() => handleWidthChange('100%')}
+                                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${pageWidth === '100%' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
+                                        >
+                                            <div className="font-medium">Pantalla completa</div>
+                                            <div className="text-xs text-gray-500">Ancho máximo disponible</div>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         )}
                         <button
                             onClick={() => setIsReadingMode(true)}
@@ -891,8 +1032,13 @@ export function TopicViewer({ topic, onBack }) {
 
             <div
                 ref={editorContainerRef}
-                className={`mx-auto relative ${isIOSLandscape ? 'ios-landscape-editor px-2 py-4 max-w-none' : 'max-w-4xl px-3 py-4 sm:px-8 sm:py-8 lg:px-12 lg:py-12'}`}
-                style={{ position: 'relative', minHeight: '80vh' }}
+                className="mx-auto relative"
+                style={{
+                    position: 'relative',
+                    minHeight: '80vh',
+                    maxWidth: isMobile ? '100%' : pageWidth,
+                    padding: isMobile ? '4px 6px' : isIOSLandscape ? '16px 8px' : '32px 48px'
+                }}
             >
                 {isReadingMode && (
                     <button
@@ -931,6 +1077,8 @@ export function TopicViewer({ topic, onBack }) {
                                         onFormat={handleFormat}
                                         onInsertImage={handleImageInsert}
                                         className="ios-landscape-toolbar"
+                                        activeHighlightColor={activeHighlightColor}
+                                        onHighlightModeChange={setActiveHighlightColor}
                                     />
                                 )}
                             </div>
@@ -939,6 +1087,8 @@ export function TopicViewer({ topic, onBack }) {
                                 onHighlight={handleHighlight}
                                 onFormat={handleFormat}
                                 onInsertImage={handleImageInsert}
+                                activeHighlightColor={activeHighlightColor}
+                                onHighlightModeChange={setActiveHighlightColor}
                             />
                         )}
                     </>
@@ -949,8 +1099,11 @@ export function TopicViewer({ topic, onBack }) {
                     contentEditable={!isReadingMode && isEditMode}
                     spellCheck={false}
                     onInput={handleInput}
-                    className="prose prose-blue max-w-none topic-content outline-none min-h-[50vh] leading-normal prose-p:my-1 prose-headings:my-2"
-                    style={{ position: 'relative' }}
+                    className={`prose prose-blue max-w-none topic-content outline-none min-h-[50vh] leading-normal prose-p:my-1 prose-headings:my-2 ${activeHighlightColor ? 'highlight-mode-active' : ''}`}
+                    style={{
+                        position: 'relative',
+                        '--highlight-color': activeHighlightColor || '#fef08a'
+                    }}
                 />
             </div>
         </div>

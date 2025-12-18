@@ -1,7 +1,7 @@
 {
   "name": "app-visor-temas-mir",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.1",
   "description": "Visor de temas MIR",
   "author": "Jorge",
   "type": "module",
