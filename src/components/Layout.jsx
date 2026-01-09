@@ -3,7 +3,7 @@ import { cn } from '../lib/utils';
 
 export function Layout({ children, className, fullScreen = false }) {
     return (
-        <div className={cn("min-h-screen bg-gray-50 text-gray-900 font-sans", className)}>
+        <div className={cn("min-h-screen bg-white text-gray-900 font-sans", className)}>
             {fullScreen ? (
                 children
             ) : (
