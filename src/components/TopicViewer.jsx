@@ -1051,8 +1051,8 @@ export function TopicViewer({ topic, onBack }) {
                                             <div className="text-xs text-gray-500">1400px (recomendado)</div>
                                         </button>
                                         <button
-                                            onClick={() => handleWidthChange('100%')}
-                                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${pageWidth === '100%' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
+                                            onClick={() => handleWidthChange('none')}
+                                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${pageWidth === 'none' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
                                         >
                                             <div className="font-medium">Pantalla completa</div>
                                             <div className="text-xs text-gray-500">Ancho máximo disponible</div>
