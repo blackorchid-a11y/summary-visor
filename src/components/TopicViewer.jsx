@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { ArrowLeft, Save, BookOpen, X, ChevronDown, ChevronUp, Monitor, SlidersHorizontal } from 'lucide-react';
+import { ArrowLeft, Save, BookOpen, X, ChevronDown, ChevronUp, Monitor } from 'lucide-react';
 import { HighlightToolbar } from './HighlightToolbar';
 import { saveTopic, getTopic } from '../lib/db';
 import { isIOSDevice, isLandscape } from '../lib/utils';
@@ -35,8 +35,7 @@ export function TopicViewer({ topic, onBack }) {
     const [activeHighlightColor, setActiveHighlightColor] = useState(null);
     const [pageWidth, setPageWidth] = useState('1400px'); // Will be set from topic
     const [showWidthMenu, setShowWidthMenu] = useState(false);
-    const [pagePadding, setPagePadding] = useState('normal'); // Will be set from topic
-    const [showPaddingMenu, setShowPaddingMenu] = useState(false);
+    const [pagePadding, setPagePadding] = useState('none'); // Will be set from topic
 
     const dragStateRef = useRef({
         isDragging: false,
@@ -77,17 +76,17 @@ export function TopicViewer({ topic, onBack }) {
                     setCurrentTopic(freshTopic);
                     // Set page width and padding from topic, fallback to defaults
                     setPageWidth(freshTopic.pageWidth || '1400px');
-                    setPagePadding(freshTopic.pagePadding || 'normal');
+                    setPagePadding(freshTopic.pagePadding || 'none');
                 } else {
                     setCurrentTopic(topic);
                     setPageWidth(topic.pageWidth || '1400px');
-                    setPagePadding(topic.pagePadding || 'normal');
+                    setPagePadding(topic.pagePadding || 'none');
                 }
             } catch (error) {
                 console.error('Error loading topic from DB:', error);
                 setCurrentTopic(topic);
                 setPageWidth(topic.pageWidth || '1400px');
-                setPagePadding(topic.pagePadding || 'normal');
+                setPagePadding(topic.pagePadding || 'none');
             }
         };
 
@@ -889,31 +888,8 @@ export function TopicViewer({ topic, onBack }) {
         }
     };
 
-    // Guardar preferencia de márgenes por documento
-    const handlePaddingChange = async (padding) => {
-        setPagePadding(padding);
-        setShowPaddingMenu(false);
-
-        // Save to current topic in database
-        try {
-            const updatedTopic = {
-                ...currentTopic,
-                pagePadding: padding,
-                lastModified: Date.now()
-            };
-            await saveTopic(updatedTopic);
-            setCurrentTopic(updatedTopic);
-        } catch (error) {
-            console.error('Error saving page padding:', error);
-        }
-    };
-
-    // Calcular el padding efectivo basado en dispositivo y preferencia del usuario
+    // Calcular el padding efectivo basado en preferencia del usuario
     const getEffectivePadding = () => {
-        if (isMobile) return '4px 6px';
-        if (isIOSLandscape) return '16px 8px';
-
-        // Use user's padding preference (width and padding are independent)
         return PADDING_PRESETS[pagePadding]?.value || PADDING_PRESETS.normal.value;
     };
 
@@ -937,26 +913,6 @@ export function TopicViewer({ topic, onBack }) {
             document.removeEventListener('click', handleClickOutside);
         };
     }, [showWidthMenu]);
-
-    // Cerrar menú de márgenes al hacer clic afuera
-    useEffect(() => {
-        if (!showPaddingMenu) return;
-
-        const handleClickOutside = (e) => {
-            if (!e.target.closest('.padding-menu-container')) {
-                setShowPaddingMenu(false);
-            }
-        };
-
-        const timeoutId = setTimeout(() => {
-            document.addEventListener('click', handleClickOutside);
-        }, 0);
-
-        return () => {
-            clearTimeout(timeoutId);
-            document.removeEventListener('click', handleClickOutside);
-        };
-    }, [showPaddingMenu]);
 
     // Also setup after table insertion
     useEffect(() => {
@@ -1014,8 +970,7 @@ export function TopicViewer({ topic, onBack }) {
                                 <span className="hidden sm:inline">Editar</span>
                             </button>
                         )}
-                        {!isMobile && (
-                            <div className="relative width-menu-container">
+                        <div className="relative width-menu-container">
                                 <button
                                     onClick={() => setShowWidthMenu(!showWidthMenu)}
                                     className={`flex items-center gap-2 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow ${isIOSLandscape ? 'px-2 py-1 text-sm' : 'px-4 py-2'}`}
@@ -1060,36 +1015,6 @@ export function TopicViewer({ topic, onBack }) {
                                     </div>
                                 )}
                             </div>
-                        )}
-                        {!isMobile && (
-                            <div className="relative padding-menu-container">
-                                <button
-                                    onClick={() => setShowPaddingMenu(!showPaddingMenu)}
-                                    className={`flex items-center gap-2 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow ${isIOSLandscape ? 'px-2 py-1 text-sm' : 'px-4 py-2'}`}
-                                    title="Márgenes de página"
-                                >
-                                    <SlidersHorizontal size={isIOSLandscape ? 16 : 18} />
-                                    <span className="hidden md:inline">Márgenes</span>
-                                </button>
-                                {showPaddingMenu && (
-                                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 border-b border-gray-100">
-                                            Márgenes internos
-                                        </div>
-                                        {Object.entries(PADDING_PRESETS).map(([key, preset]) => (
-                                            <button
-                                                key={key}
-                                                onClick={() => handlePaddingChange(key)}
-                                                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${pagePadding === key ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
-                                            >
-                                                <div className="font-medium">{preset.label}</div>
-                                                <div className="text-xs text-gray-500">{preset.description}</div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
                         <button
                             onClick={() => setIsReadingMode(true)}
                             className={`flex items-center gap-2 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow ${isIOSLandscape ? 'px-2 py-1 text-sm' : 'px-4 py-2'}`}
@@ -1121,12 +1046,12 @@ export function TopicViewer({ topic, onBack }) {
 
             <div
                 ref={editorContainerRef}
-                className="mx-auto relative"
+                className={`relative ${pageWidth !== 'none' ? 'mx-auto' : ''}`}
                 style={{
                     position: 'relative',
                     minHeight: '80vh',
-                    maxWidth: isMobile ? '100%' : pageWidth,
-                    padding: getEffectivePadding()
+                    maxWidth: pageWidth === 'none' ? '100%' : (isMobile ? '100%' : pageWidth),
+                    padding: pageWidth === 'none' ? '0' : getEffectivePadding()
                 }}
             >
                 {isReadingMode && (
@@ -1188,7 +1113,7 @@ export function TopicViewer({ topic, onBack }) {
                     contentEditable={!isReadingMode && isEditMode}
                     spellCheck={false}
                     onInput={handleInput}
-                    className={`prose prose-blue max-w-none topic-content outline-none min-h-[50vh] leading-normal prose-p:my-1 prose-headings:my-2 ${activeHighlightColor ? 'highlight-mode-active' : ''}`}
+                    className={`prose prose-blue max-w-none topic-content outline-none min-h-[50vh] leading-normal prose-p:my-1 prose-headings:my-2 ${activeHighlightColor ? 'highlight-mode-active' : ''} ${pageWidth === 'none' ? 'full-width-mode' : ''}`}
                     style={{
                         position: 'relative',
                         '--highlight-color': activeHighlightColor || '#fef08a'

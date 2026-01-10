@@ -19,6 +19,17 @@ body {
     color: #1a1a1a;
 }
 
+/* Full width mode - override imported HTML styles */
+.topic-content.full-width-mode,
+.topic-content.full-width-mode > *,
+.topic-content.full-width-mode > * > * {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    box-sizing: border-box !important;
+}
+
 /* Mermaid diagram container */
 .topic-content .mermaid {
     display: flex;
