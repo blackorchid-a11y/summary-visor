@@ -21,13 +21,33 @@ body {
 
 /* Full width mode - override imported HTML styles */
 .topic-content.full-width-mode,
-.topic-content.full-width-mode > *,
-.topic-content.full-width-mode > * > * {
+.topic-content.full-width-mode > *:not(.editor-image-wrapper),
+.topic-content.full-width-mode > * > *:not(.editor-image-wrapper):not(.image-resize-handle):not(.image-delete-btn):not(.image-mode-btn):not(.image-drag-handle) {
     max-width: 100% !important;
     width: 100% !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
     box-sizing: border-box !important;
+}
+
+/* Ensure image controls are never affected by full-width mode */
+.topic-content.full-width-mode .image-resize-handle,
+.topic-content.full-width-mode .image-delete-btn,
+.topic-content.full-width-mode .image-mode-btn,
+.topic-content.full-width-mode .image-drag-handle {
+    width: auto !important;
+    max-width: none !important;
+}
+
+/* Preserve image wrapper dimensions in full-width mode - only for inline images */
+.topic-content.full-width-mode .editor-image-wrapper:not([data-floating="true"]) {
+    max-width: none !important;
+    width: auto !important;
+}
+
+/* Floating images should always respect their explicit width */
+.topic-content.full-width-mode .editor-image-wrapper[data-floating="true"] {
+    /* Don't override width - let inline style take precedence */
 }
 
 /* Mermaid diagram container */
