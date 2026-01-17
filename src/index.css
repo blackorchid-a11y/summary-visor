@@ -707,3 +707,21 @@ button {
         border-radius: 0 !important;
     }
 }
+
+/* ========================================
+   Search Highlight Styles
+   ======================================== */
+
+mark.search-highlight {
+    background-color: #fef08a;
+    padding: 0 2px;
+    border-radius: 2px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+mark.search-highlight.current-result {
+    background-color: #fb923c;
+    outline: 2px solid #ea580c;
+    outline-offset: 1px;
+}

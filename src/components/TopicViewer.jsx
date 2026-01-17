@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { ArrowLeft, Save, BookOpen, X, ChevronDown, ChevronUp, Monitor } from 'lucide-react';
+import { ArrowLeft, Save, BookOpen, X, ChevronDown, ChevronUp, Monitor, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { HighlightToolbar } from './HighlightToolbar';
 import { saveTopic, getTopic } from '../lib/db';
 import { isIOSDevice, isLandscape } from '../lib/utils';
@@ -36,6 +36,14 @@ export function TopicViewer({ topic, onBack }) {
     const [pageWidth, setPageWidth] = useState('1400px'); // Will be set from topic
     const [showWidthMenu, setShowWidthMenu] = useState(false);
     const [pagePadding, setPagePadding] = useState('none'); // Will be set from topic
+
+    // Search functionality state
+    const [showSearch, setShowSearch] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState([]);
+    const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+    const searchInputRef = useRef(null);
+    const originalContentRef = useRef(null); // Store original content before highlighting
 
     const dragStateRef = useRef({
         isDragging: false,
@@ -103,8 +111,21 @@ export function TopicViewer({ topic, onBack }) {
 
     useEffect(() => {
         const handleKeyDown = (e) => {
+            // Handle Cmd+F (Mac) / Ctrl+F (Windows) for search
+            if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+                e.preventDefault();
+                setShowSearch(true);
+                // Focus search input after it renders
+                setTimeout(() => {
+                    searchInputRef.current?.focus();
+                }, 50);
+                return;
+            }
+
             if (e.key === 'Escape') {
-                if (selectedImage) {
+                if (showSearch) {
+                    closeSearch();
+                } else if (selectedImage) {
                     setSelectedImage(null);
                 } else if (isReadingMode) {
                     setIsReadingMode(false);
@@ -115,11 +136,20 @@ export function TopicViewer({ topic, onBack }) {
                 selectedImage.remove();
                 setSelectedImage(null);
             }
+            // Navigate search results with Enter
+            if (e.key === 'Enter' && showSearch && searchResults.length > 0) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    goToPreviousResult();
+                } else {
+                    goToNextResult();
+                }
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isReadingMode, selectedImage]);
+    }, [isReadingMode, selectedImage, showSearch, searchResults.length]);
 
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -218,6 +248,154 @@ export function TopicViewer({ topic, onBack }) {
         const timer = setTimeout(initMermaid, 150);
         return () => clearTimeout(timer);
     }, [currentTopic.content, mermaidTheme]);
+
+    // Search functionality
+    const clearSearchHighlights = useCallback(() => {
+        if (!contentRef.current) return;
+
+        // Remove all search highlight marks (skip any inside image wrappers to prevent data loss)
+        const marks = contentRef.current.querySelectorAll('mark.search-highlight');
+        marks.forEach(mark => {
+            // Skip marks inside image wrappers to prevent corruption
+            if (mark.closest('.editor-image-wrapper')) return;
+
+            const parent = mark.parentNode;
+            if (!parent) return;
+
+            while (mark.firstChild) {
+                parent.insertBefore(mark.firstChild, mark);
+            }
+            parent.removeChild(mark);
+            // Normalize to merge adjacent text nodes
+            parent.normalize();
+        });
+    }, []);
+
+    const performSearch = useCallback((query) => {
+        if (!contentRef.current || !query.trim()) {
+            clearSearchHighlights();
+            setSearchResults([]);
+            setCurrentSearchIndex(0);
+            return;
+        }
+
+        // First, clear any existing highlights
+        clearSearchHighlights();
+
+        const searchText = query.toLowerCase();
+        const results = [];
+
+        // Walk through all text nodes and find matches (skip image wrappers to prevent data loss)
+        const walker = document.createTreeWalker(
+            contentRef.current,
+            NodeFilter.SHOW_TEXT,
+            {
+                acceptNode: (node) => {
+                    // Skip text nodes inside image wrappers to prevent corruption
+                    if (node.parentElement?.closest('.editor-image-wrapper')) {
+                        return NodeFilter.FILTER_REJECT;
+                    }
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            },
+            false
+        );
+
+        const nodesToHighlight = [];
+        let node;
+        while ((node = walker.nextNode())) {
+            const text = node.textContent;
+            const lowerText = text.toLowerCase();
+            let startIndex = 0;
+            let index;
+
+            while ((index = lowerText.indexOf(searchText, startIndex)) !== -1) {
+                nodesToHighlight.push({
+                    node,
+                    startOffset: index,
+                    endOffset: index + searchText.length,
+                    text: text.substring(index, index + searchText.length)
+                });
+                startIndex = index + 1;
+            }
+        }
+
+        // Now apply highlights (in reverse order to preserve offsets)
+        nodesToHighlight.reverse().forEach((match, i) => {
+            const { node, startOffset, endOffset } = match;
+
+            // Skip if node is no longer in document
+            if (!node.parentNode) return;
+
+            const range = document.createRange();
+            range.setStart(node, startOffset);
+            range.setEnd(node, endOffset);
+
+            const mark = document.createElement('mark');
+            mark.className = 'search-highlight';
+            mark.dataset.searchIndex = nodesToHighlight.length - 1 - i;
+
+            try {
+                range.surroundContents(mark);
+                results.push(mark);
+            } catch (e) {
+                // Range may cross node boundaries, skip this match
+                console.warn('Could not highlight match:', e);
+            }
+        });
+
+        // Results are added in reverse, so reverse back to get correct order
+        results.reverse();
+        setSearchResults(results);
+        setCurrentSearchIndex(0);
+
+        // Scroll to first result
+        if (results.length > 0) {
+            scrollToResult(results[0]);
+        }
+    }, [clearSearchHighlights]);
+
+    const scrollToResult = useCallback((element) => {
+        if (!element) return;
+
+        // Remove current-result class from all, add to current
+        searchResults.forEach(r => r.classList.remove('current-result'));
+        element.classList.add('current-result');
+
+        element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
+        });
+    }, [searchResults]);
+
+    const goToNextResult = useCallback(() => {
+        if (searchResults.length === 0) return;
+        const nextIndex = (currentSearchIndex + 1) % searchResults.length;
+        setCurrentSearchIndex(nextIndex);
+        scrollToResult(searchResults[nextIndex]);
+    }, [searchResults, currentSearchIndex, scrollToResult]);
+
+    const goToPreviousResult = useCallback(() => {
+        if (searchResults.length === 0) return;
+        const prevIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;
+        setCurrentSearchIndex(prevIndex);
+        scrollToResult(searchResults[prevIndex]);
+    }, [searchResults, currentSearchIndex, scrollToResult]);
+
+    const closeSearch = useCallback(() => {
+        setShowSearch(false);
+        setSearchQuery('');
+        clearSearchHighlights();
+        setSearchResults([]);
+        setCurrentSearchIndex(0);
+    }, [clearSearchHighlights]);
+
+    // Handle search input changes
+    const handleSearchChange = useCallback((e) => {
+        const query = e.target.value;
+        setSearchQuery(query);
+        performSearch(query);
+    }, [performSearch]);
 
     // Setup drag functionality for a floating image
     const setupDragForElement = useCallback((wrapper, dragHandle) => {
@@ -449,6 +627,9 @@ export function TopicViewer({ topic, onBack }) {
 
         setIsSaving(true);
         try {
+            // Clear search highlights before saving to prevent DOM corruption
+            clearSearchHighlights();
+
             const selectedWrappers = contentDiv.querySelectorAll('.editor-image-wrapper.selected');
             selectedWrappers.forEach(w => w.classList.remove('selected'));
 
@@ -466,8 +647,8 @@ export function TopicViewer({ topic, onBack }) {
             setCurrentTopic(updatedTopic);
             setLastSaved(new Date());
 
-            console.log('Topic saved successfully. Content length:', newContent.length);
-            console.log('Contains images:', newContent.includes('editor-image-wrapper'));
+            const imageCount = (newContent.match(/editor-image-wrapper/g) || []).length;
+            console.log('Topic saved successfully. Content length:', newContent.length, 'Images:', imageCount);
 
             setTimeout(() => setIsSaving(false), 1000);
         } catch (error) {
@@ -932,6 +1113,56 @@ export function TopicViewer({ topic, onBack }) {
 
     return (
         <div className="min-h-screen bg-white">
+            {/* Search Bar */}
+            {showSearch && (
+                <div className="fixed top-0 right-0 z-50 p-3" style={{ paddingTop: 'calc(12px + env(safe-area-inset-top))' }}>
+                    <div className="flex items-center gap-2 bg-white rounded-lg shadow-lg border border-gray-300 px-3 py-2">
+                        <Search size={18} className="text-gray-400 flex-shrink-0" />
+                        <input
+                            ref={searchInputRef}
+                            type="text"
+                            value={searchQuery}
+                            onChange={handleSearchChange}
+                            placeholder="Buscar en el documento..."
+                            className="outline-none text-sm w-48 sm:w-64"
+                            autoFocus
+                        />
+                        {searchQuery && (
+                            <span className="text-xs text-gray-500 whitespace-nowrap">
+                                {searchResults.length > 0
+                                    ? `${currentSearchIndex + 1}/${searchResults.length}`
+                                    : 'Sin resultados'}
+                            </span>
+                        )}
+                        <div className="flex items-center gap-1 border-l border-gray-200 pl-2">
+                            <button
+                                onClick={goToPreviousResult}
+                                disabled={searchResults.length === 0}
+                                className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                                title="Anterior (Shift+Enter)"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+                            <button
+                                onClick={goToNextResult}
+                                disabled={searchResults.length === 0}
+                                className="p-1 hover:bg-gray-100 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                                title="Siguiente (Enter)"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                            <button
+                                onClick={closeSearch}
+                                className="p-1 hover:bg-gray-100 rounded ml-1"
+                                title="Cerrar (Esc)"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {!isReadingMode && (
                 <div
                     className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-gray-200 flex items-center justify-between shadow-sm"
