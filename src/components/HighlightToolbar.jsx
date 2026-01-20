@@ -52,10 +52,13 @@ const COLOR_PALETTE = [
 ];
 
 const FONT_SIZES = [
-    { id: 'small', value: '2', label: 'Pequeño' },
-    { id: 'normal', value: '3', label: 'Normal' },
-    { id: 'large', value: '5', label: 'Grande' },
-    { id: 'xlarge', value: '7', label: 'Extra Grande' },
+    { id: '1', value: '1', label: '8' },
+    { id: '2', value: '2', label: '10' },
+    { id: '3', value: '3', label: '12' },
+    { id: '4', value: '4', label: '14' },
+    { id: '5', value: '5', label: '18' },
+    { id: '6', value: '6', label: '24' },
+    { id: '7', value: '7', label: '36' },
 ];
 
 // Storage keys for custom colors

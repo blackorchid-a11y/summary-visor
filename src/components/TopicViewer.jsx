@@ -10,6 +10,9 @@ mermaid.initialize({
     theme: 'neutral',
     securityLevel: 'loose',
     fontFamily: 'Nunito, sans-serif',
+    flowchart: {
+        curve: 'cardinal',
+    },
 });
 
 const PADDING_PRESETS = {
@@ -230,6 +233,9 @@ export function TopicViewer({ topic, onBack }) {
                         theme: mermaidTheme,
                         securityLevel: 'loose',
                         fontFamily: 'Nunito, sans-serif',
+                        flowchart: {
+                            curve: 'cardinal',
+                        },
                     });
 
                     try {
