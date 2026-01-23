@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 
 function createWindow() {
@@ -29,7 +29,63 @@ function createWindow() {
         win.loadFile(path.join(__dirname, '../dist/index.html'));
     }
 
-    win.setMenuBarVisibility(false); // Hide default menu bar for cleaner look
+    // Create menu with zoom accelerators (needed for keyboard shortcuts to work on Windows)
+    const template = [
+        {
+            label: 'View',
+            submenu: [
+                {
+                    label: 'Zoom In',
+                    accelerator: 'CmdOrCtrl+Plus',
+                    click: () => {
+                        const focusedWindow = BrowserWindow.getFocusedWindow();
+                        if (focusedWindow) {
+                            const currentZoom = focusedWindow.webContents.getZoomLevel();
+                            focusedWindow.webContents.setZoomLevel(currentZoom + 0.5);
+                        }
+                    }
+                },
+                {
+                    label: 'Zoom In',
+                    accelerator: 'CmdOrCtrl+=',
+                    visible: false,
+                    click: () => {
+                        const focusedWindow = BrowserWindow.getFocusedWindow();
+                        if (focusedWindow) {
+                            const currentZoom = focusedWindow.webContents.getZoomLevel();
+                            focusedWindow.webContents.setZoomLevel(currentZoom + 0.5);
+                        }
+                    }
+                },
+                {
+                    label: 'Zoom Out',
+                    accelerator: 'CmdOrCtrl+-',
+                    click: () => {
+                        const focusedWindow = BrowserWindow.getFocusedWindow();
+                        if (focusedWindow) {
+                            const currentZoom = focusedWindow.webContents.getZoomLevel();
+                            focusedWindow.webContents.setZoomLevel(currentZoom - 0.5);
+                        }
+                    }
+                },
+                {
+                    label: 'Reset Zoom',
+                    accelerator: 'CmdOrCtrl+0',
+                    click: () => {
+                        const focusedWindow = BrowserWindow.getFocusedWindow();
+                        if (focusedWindow) {
+                            focusedWindow.webContents.setZoomLevel(0);
+                        }
+                    }
+                }
+            ]
+        }
+    ];
+
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
+
+    win.setMenuBarVisibility(false); // Hide menu bar but keep accelerators working
 }
 
 // Auto-updater logic
