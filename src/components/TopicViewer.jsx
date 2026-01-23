@@ -570,7 +570,9 @@ export function TopicViewer({ topic, onBack }) {
             let startWidth = 0;
 
             const handleResizeStart = (e) => {
-                if (!isEditMode) return;
+                // Check edit mode via DOM instead of closure to avoid stale value
+                const contentDiv = contentRef.current;
+                if (!contentDiv || contentDiv.contentEditable !== 'true') return;
                 e.preventDefault();
                 e.stopPropagation();
                 isResizing = true;

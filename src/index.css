@@ -30,12 +30,23 @@ body {
     box-sizing: border-box !important;
 }
 
-/* Ensure image controls are never affected by full-width mode */
-.topic-content.full-width-mode .image-resize-handle,
+/* Override full-width mode for image controls - use explicit dimensions */
+.topic-content.full-width-mode .image-resize-handle {
+    width: 14px !important;
+    height: 14px !important;
+    max-width: none !important;
+}
+
 .topic-content.full-width-mode .image-delete-btn,
-.topic-content.full-width-mode .image-mode-btn,
+.topic-content.full-width-mode .image-mode-btn {
+    width: 24px !important;
+    height: 24px !important;
+    max-width: none !important;
+}
+
 .topic-content.full-width-mode .image-drag-handle {
-    width: auto !important;
+    width: 16px !important;
+    height: 32px !important;
     max-width: none !important;
 }
 
