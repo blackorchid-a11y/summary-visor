@@ -4,16 +4,24 @@ import { HighlightToolbar } from './HighlightToolbar';
 import { saveTopic, getTopic } from '../lib/db';
 import { isIOSDevice, isLandscape } from '../lib/utils';
 import mermaid from 'mermaid';
+import DOMPurify from 'dompurify';
 
-mermaid.initialize({
+// 'antiscript' keeps HTML labels working but strips script content from diagrams
+const makeMermaidConfig = (theme) => ({
     startOnLoad: false,
-    theme: 'neutral',
-    securityLevel: 'loose',
+    theme,
+    securityLevel: 'antiscript',
     fontFamily: 'Nunito, sans-serif',
     flowchart: {
         curve: 'cardinal',
     },
 });
+
+mermaid.initialize(makeMermaidConfig('neutral'));
+
+// contenteditable is not in DOMPurify's default attribute allowlist, but the
+// editor chrome (image handles/buttons) relies on contenteditable="false"
+const SANITIZE_CONFIG = { ADD_ATTR: ['contenteditable'] };
 
 const PADDING_PRESETS = {
     none: { label: 'Sin márgenes', description: 'Sin márgenes internos', value: '0' },
@@ -21,6 +29,48 @@ const PADDING_PRESETS = {
     normal: { label: 'Normal', description: '32px arriba/abajo, 48px lados', value: '32px 48px' },
     wide: { label: 'Amplio', description: '48px arriba/abajo, 64px lados', value: '48px 64px' }
 };
+
+const WIDTH_PRESETS = [
+    { value: '900px', label: 'Estrecho', description: '900px - lectura concentrada' },
+    { value: '1100px', label: 'Moderado', description: '1100px' },
+    { value: '1400px', label: 'Amplio', description: '1400px (recomendado)' },
+    { value: 'none', label: 'Pantalla completa', description: 'Ancho máximo disponible' },
+];
+
+// Unwrap search <mark> elements from any root (live DOM or a clone for saving)
+function unwrapSearchMarks(root) {
+    const marks = root.querySelectorAll('mark.search-highlight');
+    marks.forEach(mark => {
+        // Skip marks inside image wrappers to prevent corruption
+        if (mark.closest('.editor-image-wrapper')) return;
+
+        const parent = mark.parentNode;
+        if (!parent) return;
+
+        while (mark.firstChild) {
+            parent.insertBefore(mark.firstChild, mark);
+        }
+        parent.removeChild(mark);
+        // Normalize to merge adjacent text nodes
+        parent.normalize();
+    });
+}
+
+// Serialize editor content for persistence: strip view-only state (search
+// highlights, selection/drag classes, table resize handles) and restore
+// positions that the viewport clamp displaced, without touching the live DOM
+function serializeContent(contentDiv) {
+    const clone = contentDiv.cloneNode(true);
+    unwrapSearchMarks(clone);
+    clone.querySelectorAll('.table-col-resize-handle, .table-row-resize-handle').forEach(el => el.remove());
+    clone.querySelectorAll('.editor-image-wrapper.selected').forEach(w => w.classList.remove('selected'));
+    clone.querySelectorAll('.editor-image-wrapper.dragging').forEach(w => w.classList.remove('dragging'));
+    clone.querySelectorAll('[data-original-left]').forEach(el => {
+        el.style.left = el.getAttribute('data-original-left');
+        el.removeAttribute('data-original-left');
+    });
+    return clone.innerHTML;
+}
 
 export function TopicViewer({ topic, onBack }) {
     const contentRef = useRef(null);
@@ -47,6 +97,9 @@ export function TopicViewer({ topic, onBack }) {
     const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
     const searchInputRef = useRef(null);
     const originalContentRef = useRef(null); // Store original content before highlighting
+    const isDirtyRef = useRef(false); // Unsaved edits in the contentEditable DOM
+    const lastSavedContentRef = useRef(null); // Content we just serialized — skip re-rendering it
+    const renderedMermaidThemeRef = useRef('neutral');
 
     const dragStateRef = useRef({
         isDragging: false,
@@ -81,24 +134,17 @@ export function TopicViewer({ topic, onBack }) {
 
     useEffect(() => {
         const loadTopicFromDB = async () => {
+            let freshTopic = null;
             try {
-                const freshTopic = await getTopic(topic.id);
-                if (freshTopic) {
-                    setCurrentTopic(freshTopic);
-                    // Set page width and padding from topic, fallback to defaults
-                    setPageWidth(freshTopic.pageWidth || '1400px');
-                    setPagePadding(freshTopic.pagePadding || 'none');
-                } else {
-                    setCurrentTopic(topic);
-                    setPageWidth(topic.pageWidth || '1400px');
-                    setPagePadding(topic.pagePadding || 'none');
-                }
+                freshTopic = await getTopic(topic.id);
             } catch (error) {
                 console.error('Error loading topic from DB:', error);
-                setCurrentTopic(topic);
-                setPageWidth(topic.pageWidth || '1400px');
-                setPagePadding(topic.pagePadding || 'none');
             }
+            // Fallback to the prop if the DB has no copy (or the read failed)
+            const loaded = freshTopic || topic;
+            setCurrentTopic(loaded);
+            setPageWidth(loaded.pageWidth || '1400px');
+            setPagePadding(loaded.pagePadding || 'none');
         };
 
         window.scrollTo(0, 0);
@@ -108,51 +154,14 @@ export function TopicViewer({ topic, onBack }) {
     // Update DOM when currentTopic changes
     useEffect(() => {
         if (contentRef.current && currentTopic.content) {
-            contentRef.current.innerHTML = currentTopic.content;
+            // Content we just serialized from this DOM is already rendered —
+            // re-assigning innerHTML would destroy the caret and all listeners
+            if (currentTopic.content === lastSavedContentRef.current) return;
+            // Stored/imported content is untrusted: strip scripts and event
+            // handlers before it touches the DOM
+            contentRef.current.innerHTML = DOMPurify.sanitize(currentTopic.content, SANITIZE_CONFIG);
         }
     }, [currentTopic.id, currentTopic.content]);
-
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            // Handle Cmd+F (Mac) / Ctrl+F (Windows) for search
-            if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
-                e.preventDefault();
-                setShowSearch(true);
-                // Focus search input after it renders
-                setTimeout(() => {
-                    searchInputRef.current?.focus();
-                }, 50);
-                return;
-            }
-
-            if (e.key === 'Escape') {
-                if (showSearch) {
-                    closeSearch();
-                } else if (selectedImage) {
-                    setSelectedImage(null);
-                } else if (isReadingMode) {
-                    setIsReadingMode(false);
-                }
-            }
-            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedImage) {
-                e.preventDefault();
-                selectedImage.remove();
-                setSelectedImage(null);
-            }
-            // Navigate search results with Enter
-            if (e.key === 'Enter' && showSearch && searchResults.length > 0) {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    goToPreviousResult();
-                } else {
-                    goToNextResult();
-                }
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isReadingMode, selectedImage, showSearch, searchResults.length]);
 
     useEffect(() => {
         const handleClickOutside = (e) => {
@@ -171,8 +180,9 @@ export function TopicViewer({ topic, onBack }) {
             if (!state.isDragging || !state.element) return;
 
             e.preventDefault();
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            // ?? not ||: clientX === 0 at the viewport edge is a valid coordinate
+            const clientX = e.clientX ?? e.touches?.[0]?.clientX;
+            const clientY = e.clientY ?? e.touches?.[0]?.clientY;
 
             const deltaX = clientX - state.startX;
             const deltaY = clientY - state.startY;
@@ -195,6 +205,9 @@ export function TopicViewer({ topic, onBack }) {
             const state = dragStateRef.current;
             if (state.isDragging && state.element) {
                 state.element.classList.remove('dragging');
+                // The drop position is the user's new intent — forget any clamped original
+                state.element.removeAttribute('data-original-left');
+                isDirtyRef.current = true;
             }
             state.isDragging = false;
             state.element = null;
@@ -214,6 +227,14 @@ export function TopicViewer({ topic, onBack }) {
     }, []);
 
     useEffect(() => {
+        // After a save the DOM already shows this exact content — re-rendering
+        // every diagram would only cause flicker
+        if (currentTopic.content === lastSavedContentRef.current &&
+            renderedMermaidThemeRef.current === mermaidTheme) {
+            return;
+        }
+        renderedMermaidThemeRef.current = mermaidTheme;
+
         const initMermaid = async () => {
             if (contentRef.current) {
                 const nodes = contentRef.current.querySelectorAll('.mermaid');
@@ -228,15 +249,7 @@ export function TopicViewer({ topic, onBack }) {
                         }
                     });
 
-                    mermaid.initialize({
-                        startOnLoad: false,
-                        theme: mermaidTheme,
-                        securityLevel: 'loose',
-                        fontFamily: 'Nunito, sans-serif',
-                        flowchart: {
-                            curve: 'cardinal',
-                        },
-                    });
+                    mermaid.initialize(makeMermaidConfig(mermaidTheme));
 
                     try {
                         await mermaid.run({
@@ -258,23 +271,7 @@ export function TopicViewer({ topic, onBack }) {
     // Search functionality
     const clearSearchHighlights = useCallback(() => {
         if (!contentRef.current) return;
-
-        // Remove all search highlight marks (skip any inside image wrappers to prevent data loss)
-        const marks = contentRef.current.querySelectorAll('mark.search-highlight');
-        marks.forEach(mark => {
-            // Skip marks inside image wrappers to prevent corruption
-            if (mark.closest('.editor-image-wrapper')) return;
-
-            const parent = mark.parentNode;
-            if (!parent) return;
-
-            while (mark.firstChild) {
-                parent.insertBefore(mark.firstChild, mark);
-            }
-            parent.removeChild(mark);
-            // Normalize to merge adjacent text nodes
-            parent.normalize();
-        });
+        unwrapSearchMarks(contentRef.current);
     }, []);
 
     const performSearch = useCallback((query) => {
@@ -322,7 +319,9 @@ export function TopicViewer({ topic, onBack }) {
                     endOffset: index + searchText.length,
                     text: text.substring(index, index + searchText.length)
                 });
-                startIndex = index + 1;
+                // Advance past the whole match: overlapping matches would make
+                // surroundContents truncate the node under a later range
+                startIndex = index + searchText.length;
             }
         }
 
@@ -333,19 +332,18 @@ export function TopicViewer({ topic, onBack }) {
             // Skip if node is no longer in document
             if (!node.parentNode) return;
 
-            const range = document.createRange();
-            range.setStart(node, startOffset);
-            range.setEnd(node, endOffset);
-
             const mark = document.createElement('mark');
             mark.className = 'search-highlight';
             mark.dataset.searchIndex = nodesToHighlight.length - 1 - i;
 
             try {
+                const range = document.createRange();
+                range.setStart(node, startOffset);
+                range.setEnd(node, endOffset);
                 range.surroundContents(mark);
                 results.push(mark);
             } catch (e) {
-                // Range may cross node boundaries, skip this match
+                // Offsets may be stale or the range may cross node boundaries; skip this match
                 console.warn('Could not highlight match:', e);
             }
         });
@@ -362,17 +360,18 @@ export function TopicViewer({ topic, onBack }) {
     }, [clearSearchHighlights]);
 
     const scrollToResult = useCallback((element) => {
-        if (!element) return;
+        if (!element || !contentRef.current) return;
 
-        // Remove current-result class from all, add to current
-        searchResults.forEach(r => r.classList.remove('current-result'));
+        // Query the DOM instead of state: state may be stale right after performSearch
+        contentRef.current.querySelectorAll('mark.search-highlight.current-result')
+            .forEach(r => r.classList.remove('current-result'));
         element.classList.add('current-result');
 
         element.scrollIntoView({
             behavior: 'smooth',
             block: 'center'
         });
-    }, [searchResults]);
+    }, []);
 
     const goToNextResult = useCallback(() => {
         if (searchResults.length === 0) return;
@@ -403,17 +402,74 @@ export function TopicViewer({ topic, onBack }) {
         performSearch(query);
     }, [performSearch]);
 
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Handle Cmd+F (Mac) / Ctrl+F (Windows) for search
+            if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+                e.preventDefault();
+                setShowSearch(true);
+                // Focus search input after it renders
+                setTimeout(() => {
+                    searchInputRef.current?.focus();
+                }, 50);
+                return;
+            }
+
+            if (e.key === 'Escape') {
+                if (showSearch) {
+                    closeSearch();
+                } else if (selectedImage) {
+                    setSelectedImage(null);
+                } else if (isReadingMode) {
+                    setIsReadingMode(false);
+                }
+            }
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedImage) {
+                // Don't hijack Backspace typed into a text field (e.g. the search input)
+                const inTextField = e.target instanceof HTMLElement &&
+                    (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA');
+                if (!inTextField) {
+                    e.preventDefault();
+                    selectedImage.remove();
+                    setSelectedImage(null);
+                    isDirtyRef.current = true;
+                }
+            }
+            // Navigate search results with Enter
+            if (e.key === 'Enter' && showSearch && searchResults.length > 0) {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    goToPreviousResult();
+                } else {
+                    goToNextResult();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isReadingMode, selectedImage, showSearch, searchResults.length, goToNextResult, goToPreviousResult, closeSearch]);
+
     // Setup drag functionality for a floating image
     const setupDragForElement = useCallback((wrapper, dragHandle) => {
+        // Bind once per node: this runs again on every edit-mode toggle and the
+        // old listeners are never removed. A JS property (not an attribute) is
+        // the marker because it disappears exactly when the listeners do —
+        // whenever innerHTML recreates the node.
+        if (dragHandle._dragBound) return;
+        dragHandle._dragBound = true;
+
         const handleDragStart = (e) => {
-            if (!isEditMode) return;
+            // Check edit mode via DOM instead of closure to avoid stale value
+            const contentDiv = contentRef.current;
+            if (!contentDiv || contentDiv.contentEditable !== 'true') return;
             if (wrapper.getAttribute('data-floating') !== 'true') return;
 
             e.preventDefault();
             e.stopPropagation();
 
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            const clientX = e.clientX ?? e.touches?.[0]?.clientX;
+            const clientY = e.clientY ?? e.touches?.[0]?.clientY;
 
             dragStateRef.current = {
                 isDragging: true,
@@ -430,7 +486,7 @@ export function TopicViewer({ topic, onBack }) {
 
         dragHandle.addEventListener('mousedown', handleDragStart);
         dragHandle.addEventListener('touchstart', handleDragStart, { passive: false });
-    }, [isEditMode]);
+    }, []);
 
     // Toggle image between inline and floating mode
     const toggleImageMode = useCallback((wrapper) => {
@@ -468,11 +524,11 @@ export function TopicViewer({ topic, onBack }) {
 
         } else {
             // Convert from inline to floating
-            
+
             // First, get the current visual position BEFORE any DOM changes
             const wrapperRect = wrapper.getBoundingClientRect();
             const contentRect = contentContainer.getBoundingClientRect();
-            
+
             // Calculate position relative to contentContainer
             const newLeft = wrapperRect.left - contentRect.left;
             const newTop = wrapperRect.top - contentRect.top;
@@ -522,6 +578,7 @@ export function TopicViewer({ topic, onBack }) {
         }
 
         setSelectedImage(wrapper);
+        isDirtyRef.current = true;
     }, [isEditMode, setupDragForElement]);
 
     // Setup all event listeners for an image wrapper
@@ -553,6 +610,7 @@ export function TopicViewer({ topic, onBack }) {
                 e.stopPropagation();
                 wrapper.remove();
                 setSelectedImage(null);
+                isDirtyRef.current = true;
             };
         }
 
@@ -576,21 +634,32 @@ export function TopicViewer({ topic, onBack }) {
                 e.preventDefault();
                 e.stopPropagation();
                 isResizing = true;
-                startX = e.clientX || (e.touches && e.touches[0].clientX);
+                startX = e.clientX ?? e.touches?.[0]?.clientX;
                 startWidth = wrapper.offsetWidth;
+
+                // Same bound the drag clamp enforces: right edge stays inside the
+                // container. For floating images that means accounting for their
+                // left offset. Computed once — the container can't change mid-drag,
+                // and reading offsetWidth per mousemove forces a reflow per frame.
+                const isFloating = wrapper.getAttribute('data-floating') === 'true';
+                const wrapperLeft = isFloating ? (parseInt(wrapper.style.left, 10) || 0) : 0;
+                const maxWidth = contentDiv.offsetWidth - wrapperLeft;
 
                 const handleResizeMove = (moveE) => {
                     if (!isResizing) return;
                     moveE.preventDefault();
-                    const clientX = moveE.clientX || (moveE.touches && moveE.touches[0].clientX);
+
+                    const clientX = moveE.clientX ?? moveE.touches?.[0]?.clientX;
                     const newWidth = startWidth + (clientX - startX);
-                    if (newWidth >= 50 && newWidth <= 800) {
+
+                    if (newWidth >= 50 && newWidth <= maxWidth) {
                         wrapper.style.width = newWidth + 'px';
                     }
                 };
 
                 const handleResizeEnd = () => {
                     isResizing = false;
+                    isDirtyRef.current = true;
                     document.removeEventListener('mousemove', handleResizeMove);
                     document.removeEventListener('mouseup', handleResizeEnd);
                     document.removeEventListener('touchmove', handleResizeMove);
@@ -625,8 +694,73 @@ export function TopicViewer({ topic, onBack }) {
         setupAllImageListeners();
     }, [isEditMode, setupAllImageListeners, currentTopic.content]);
 
-    const handleInput = async () => {
-        // Auto-save logic removed
+    // Ensure floating images stay within bounds when the container narrows.
+    // The clamp is reversible: the user's intended position is kept in
+    // data-original-left and restored when space allows (and on save, so a
+    // transient window narrowing never corrupts the stored layout).
+    useEffect(() => {
+        const checkFloatingImages = () => {
+            const contentDiv = contentRef.current;
+            if (!contentDiv) return;
+
+            const containerWidth = contentDiv.offsetWidth;
+            const floatingImages = contentDiv.querySelectorAll('.editor-image-wrapper[data-floating="true"]');
+
+            floatingImages.forEach(img => {
+                const intendedLeft = img.hasAttribute('data-original-left')
+                    ? parseInt(img.getAttribute('data-original-left'), 10)
+                    : parseInt(img.style.left || '0', 10);
+                const imgWidth = img.offsetWidth;
+
+                if (intendedLeft + imgWidth > containerWidth) {
+                    img.setAttribute('data-original-left', intendedLeft + 'px');
+                    img.style.left = Math.max(0, containerWidth - imgWidth) + 'px';
+                } else if (img.hasAttribute('data-original-left')) {
+                    img.style.left = intendedLeft + 'px';
+                    img.removeAttribute('data-original-left');
+                }
+            });
+        };
+
+        // Coalesce resize bursts into one check per frame
+        let frame = null;
+        const scheduleCheck = () => {
+            if (frame) cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(checkFloatingImages);
+        };
+
+        checkFloatingImages();
+        window.addEventListener('resize', scheduleCheck);
+        window.addEventListener('orientationchange', scheduleCheck);
+
+        return () => {
+            if (frame) cancelAnimationFrame(frame);
+            window.removeEventListener('resize', scheduleCheck);
+            window.removeEventListener('orientationchange', scheduleCheck);
+        };
+    }, [pageWidth, isEditMode, currentTopic.content]);
+
+    const handleInput = () => {
+        isDirtyRef.current = true;
+    };
+
+    // Warn before discarding unsaved edits (app close / refresh)
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            if (isDirtyRef.current) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, []);
+
+    const handleBackClick = () => {
+        if (isDirtyRef.current && !window.confirm('Tienes cambios sin guardar. ¿Salir sin guardar?')) {
+            return;
+        }
+        onBack();
     };
 
     const handleSave = async () => {
@@ -635,16 +769,9 @@ export function TopicViewer({ topic, onBack }) {
 
         setIsSaving(true);
         try {
-            // Clear search highlights before saving to prevent DOM corruption
-            clearSearchHighlights();
-
-            const selectedWrappers = contentDiv.querySelectorAll('.editor-image-wrapper.selected');
-            selectedWrappers.forEach(w => w.classList.remove('selected'));
-
-            const draggingWrappers = contentDiv.querySelectorAll('.editor-image-wrapper.dragging');
-            draggingWrappers.forEach(w => w.classList.remove('dragging'));
-
-            const newContent = contentDiv.innerHTML;
+            // Serialize from a clone: the live DOM (search highlights, selection,
+            // caret) stays untouched, and view-only state never reaches the DB
+            const newContent = serializeContent(contentDiv);
             const updatedTopic = {
                 ...currentTopic,
                 content: newContent,
@@ -652,7 +779,9 @@ export function TopicViewer({ topic, onBack }) {
             };
 
             await saveTopic(updatedTopic);
+            lastSavedContentRef.current = newContent;
             setCurrentTopic(updatedTopic);
+            isDirtyRef.current = false;
             setLastSaved(new Date());
 
             const imageCount = (newContent.match(/editor-image-wrapper/g) || []).length;
@@ -852,6 +981,10 @@ export function TopicViewer({ topic, onBack }) {
         contentDiv.appendChild(p);
     }, [createImageWrapper]);
 
+    useEffect(() => {
+        isDirtyRef.current = false;
+    }, [currentTopic.id]);
+
     const handleImageInsert = useCallback(() => {
         const input = document.createElement('input');
         input.type = 'file';
@@ -876,6 +1009,7 @@ export function TopicViewer({ topic, onBack }) {
             const reader = new FileReader();
             reader.onload = (e) => {
                 insertImageAtCursor(e.target.result);
+                isDirtyRef.current = true;
                 resolve();
             };
             reader.onerror = () => {
@@ -931,8 +1065,13 @@ export function TopicViewer({ topic, onBack }) {
         tables.forEach(table => {
             const cells = table.querySelectorAll('td, th');
             cells.forEach(cell => {
-                // Remove existing column resize handle (and its event listeners) before adding new one
+                // Idempotent: a handle with a live listener carries the _bound JS
+                // property (lost exactly when innerHTML recreates the node, along
+                // with the listener). Skipping bound handles is what lets the
+                // MutationObserver below settle — unconditional remove+append
+                // re-triggered it forever.
                 const existingColHandle = cell.querySelector('.table-col-resize-handle');
+                if (existingColHandle?._bound) return;
                 if (existingColHandle) {
                     existingColHandle.remove();
                 }
@@ -941,6 +1080,7 @@ export function TopicViewer({ topic, onBack }) {
                 const colHandle = document.createElement('div');
                 colHandle.className = 'table-col-resize-handle';
                 colHandle.contentEditable = 'false';
+                colHandle._bound = true;
                 cell.appendChild(colHandle);
 
                 colHandle.addEventListener('mousedown', (e) => {
@@ -978,6 +1118,7 @@ export function TopicViewer({ topic, onBack }) {
                     const rowHandle = document.createElement('div');
                     rowHandle.className = 'table-row-resize-handle';
                     rowHandle.contentEditable = 'false';
+                    rowHandle._bound = true;
                     cell.appendChild(rowHandle);
 
                     rowHandle.addEventListener('mousedown', (e) => {
@@ -1183,7 +1324,7 @@ export function TopicViewer({ topic, onBack }) {
                 >
                     <div className={`flex items-center flex-1 min-w-0 ${isIOSLandscape ? 'gap-2' : 'gap-4'}`}>
                         <button
-                            onClick={onBack}
+                            onClick={handleBackClick}
                             className={`hover:bg-gray-100 rounded-full transition-colors text-gray-600 ${isIOSLandscape ? 'p-1' : 'p-2'}`}
                             title="Volver"
                         >
@@ -1210,50 +1351,32 @@ export function TopicViewer({ topic, onBack }) {
                             </button>
                         )}
                         <div className="relative width-menu-container">
-                                <button
-                                    onClick={() => setShowWidthMenu(!showWidthMenu)}
-                                    className={`flex items-center gap-2 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow ${isIOSLandscape ? 'px-2 py-1 text-sm' : 'px-4 py-2'}`}
-                                    title="Ancho de página"
-                                >
-                                    <Monitor size={isIOSLandscape ? 16 : 18} />
-                                    <span className="hidden md:inline">Ancho</span>
-                                </button>
-                                {showWidthMenu && (
-                                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 border-b border-gray-100">
-                                            Ancho de página
-                                        </div>
-                                        <button
-                                            onClick={() => handleWidthChange('900px')}
-                                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${pageWidth === '900px' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
-                                        >
-                                            <div className="font-medium">Estrecho</div>
-                                            <div className="text-xs text-gray-500">900px - lectura concentrada</div>
-                                        </button>
-                                        <button
-                                            onClick={() => handleWidthChange('1100px')}
-                                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${pageWidth === '1100px' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
-                                        >
-                                            <div className="font-medium">Moderado</div>
-                                            <div className="text-xs text-gray-500">1100px</div>
-                                        </button>
-                                        <button
-                                            onClick={() => handleWidthChange('1400px')}
-                                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${pageWidth === '1400px' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
-                                        >
-                                            <div className="font-medium">Amplio</div>
-                                            <div className="text-xs text-gray-500">1400px (recomendado)</div>
-                                        </button>
-                                        <button
-                                            onClick={() => handleWidthChange('none')}
-                                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${pageWidth === 'none' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
-                                        >
-                                            <div className="font-medium">Pantalla completa</div>
-                                            <div className="text-xs text-gray-500">Ancho máximo disponible</div>
-                                        </button>
+                            <button
+                                onClick={() => setShowWidthMenu(!showWidthMenu)}
+                                className={`flex items-center gap-2 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow ${isIOSLandscape ? 'px-2 py-1 text-sm' : 'px-4 py-2'}`}
+                                title="Ancho de página"
+                            >
+                                <Monitor size={isIOSLandscape ? 16 : 18} />
+                                <span className="hidden md:inline">Ancho</span>
+                            </button>
+                            {showWidthMenu && (
+                                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 border-b border-gray-100">
+                                        Ancho de página
                                     </div>
-                                )}
-                            </div>
+                                    {WIDTH_PRESETS.map(({ value, label, description }) => (
+                                        <button
+                                            key={value}
+                                            onClick={() => handleWidthChange(value)}
+                                            className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${pageWidth === value ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700'}`}
+                                        >
+                                            <div className="font-medium">{label}</div>
+                                            <div className="text-xs text-gray-500">{description}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                         <button
                             onClick={() => setIsReadingMode(true)}
                             className={`flex items-center gap-2 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200 shadow-sm hover:shadow ${isIOSLandscape ? 'px-2 py-1 text-sm' : 'px-4 py-2'}`}

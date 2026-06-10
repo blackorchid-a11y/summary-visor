@@ -45,16 +45,17 @@ function App() {
             const subjectTopics = await getTopicsBySubject(subject.id);
             setTopics(subjectTopics);
 
+            let restoredTopic = null;
             if (savedTopicId) {
-              const topic = await getTopic(savedTopicId);
-              if (topic) {
-                setActiveTopic(topic);
+              restoredTopic = await getTopic(savedTopicId);
+              if (restoredTopic) {
+                setActiveTopic(restoredTopic);
               }
             }
 
-            if (savedView) {
-              setView(savedView);
-            }
+            // Only enter a view whose data actually loaded — restoring to
+            // 'topic' after the topic was deleted would render a blank screen
+            setView(savedView === 'topic' && restoredTopic ? 'topic' : 'subject');
           }
         }
       } catch (error) {
@@ -68,6 +69,9 @@ function App() {
 
   // Save state to localStorage
   useEffect(() => {
+    // Don't persist the initial 'home' state before loadData has restored —
+    // doing so would wipe the saved IDs that restore is about to read
+    if (loading) return;
     localStorage.setItem('app_view', view);
     if (view === 'home') {
       localStorage.removeItem('app_activeSubjectId');
@@ -79,7 +83,7 @@ function App() {
       if (activeSubject) localStorage.setItem('app_activeSubjectId', activeSubject.id);
       if (activeTopic) localStorage.setItem('app_activeTopicId', activeTopic.id);
     }
-  }, [view, activeSubject, activeTopic]);
+  }, [view, activeSubject, activeTopic, loading]);
 
   const handleSubjectClick = async (subject) => {
     setActiveSubject(subject);

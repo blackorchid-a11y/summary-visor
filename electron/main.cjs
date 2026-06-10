@@ -7,14 +7,11 @@ function createWindow() {
         height: 800,
         icon: path.join(__dirname, '../public/logo.png'),
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false, // For simple local apps this is often easier, though less secure. 
-            // For a production app with external content, we'd want contextIsolation: true and a preload script.
-            // Given we are loading local HTML files, we might need node integration if we were doing file system ops directly,
-            // but our React app uses 'idb' which is browser-native.
-            // However, to be safe and standard, let's stick to defaults where possible, but for this specific request
-            // of a "local exe", we often want to be able to access local files easily.
-            // Let's start with standard web preferences.
+            // The renderer only uses browser APIs (idb, DOM); it never needs Node.
+            // Keeping Node out of the renderer means injected content in an
+            // imported note can't escalate to code execution on the machine.
+            nodeIntegration: false,
+            contextIsolation: true,
         },
     });
 
